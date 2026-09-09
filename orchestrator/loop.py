@@ -6,7 +6,6 @@ import time
 
 from orchestrator import config, executor, outcome, precedent, proposer, recon, report
 from orchestrator.exceptions import CompilationFailed
-from orchestrator.proposer import ExploitProposal
 
 
 def run_pipeline(
