@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PoCForge — Security Assessment Results</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 2rem; background: #0f1117; color: #e6edf3; }
+    h1 { color: #58a6ff; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .badge-vuln { background: #238636; color: #fff; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: bold; }
+    .badge-fallback { background: #9e6a03; color: #fff; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: bold; }
+    .badge-secure { background: #da3633; color: #fff; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: bold; }
+    pre { background: #0d1117; border: 1px solid #30363d; padding: 1rem; overflow-x: auto; font-size: 0.85rem; border-radius: 6px; }
+    details { margin-top: 1rem; }
+    summary { cursor: pointer; color: #58a6ff; }
+    a { color: #58a6ff; }
+    footer { margin-top: 2rem; color: #8b949e; font-size: 0.9rem; }
+    .meta { color: #8b949e; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>PoCForge</h1>
+  <p class="meta">Agentic smart contract vulnerability verification — educational sandbox demo</p>
+
+  {% for name, report in results.items() %}
+  <div class="card">
+    <h2>{{ name }} <span class="{{ report.verdict_css }}">{{ report.verdict_label }}</span></h2>
+    <p>{{ report.verdict_explanation }}</p>
+    <p class="meta">
+      Class: {{ report.vulnerability_class | default('unknown') }} |
+      Drain: {{ report.drain_amount_wei | default(0) }} wei |
+      Attempts: {{ report.attempts | default(0) }} |
+      Fallback: {{ report.used_fallback | default(false) }}
+    </p>
+    {% if report.summary %}
+    <p><strong>Summary:</strong> {{ report.summary }}</p>
+    {% endif %}
+    {% if report.evidence %}
+    <p><strong>Evidence:</strong> {{ report.evidence }}</p>
+    {% endif %}
+
+    <details>
+      <summary>Generated exploit source</summary>
+      <pre><code>{{ report.generated_exploit_source | default('N/A') }}</code></pre>
+    </details>
+
+    <details>
+      <summary>Tavily precedent citations</summary>
+      <p>{{ report.precedent_citation | default('No citations') }}</p>
+    </details>
+
+    <details>
+      <summary>Attempt history ({{ report.attempt_history | length }} attempts)</summary>
+      <pre><code>{{ report.attempt_history | tojson(indent=2) }}</code></pre>
+    </details>
+  </div>
+  {% endfor %}
+
+  <footer>
+    Powered by Nemotron Nano / Ultra / Super on Nebius Token Factory + Tavily
+  </footer>
+</body>
+</html>

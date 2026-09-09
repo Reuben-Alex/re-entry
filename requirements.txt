@@ -1,0 +1,21 @@
+# --- chain / sandbox ---
+web3==6.20.3
+py-solc-x==2.0.3
+contree-sdk>=0.1.0
+
+# --- Nebius / model calls ---
+openai>=1.40.0
+
+# --- research grounding ---
+tavily-python>=0.5.0
+
+# --- dashboard ---
+fastapi>=0.115.0
+uvicorn>=0.30.0
+Jinja2>=3.1.4
+
+# --- testing ---
+pytest>=8.3.0
+
+# --- misc ---
+python-dotenv>=1.0.1
