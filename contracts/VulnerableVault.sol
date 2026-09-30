@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 /// @title VulnerableVault
 /// @notice DELIBERATELY BUGGY demo contract, modeled in miniature on the
 ///         classic 2016 DAO-hack reentrancy pattern. This is the target
-///         PoCForge's agent is expected to find and drain.
+///         Re-entry's agent is expected to find and drain.
 ///
 /// WHAT THIS CONTRACT DOES (in plain terms):
 ///   Anyone can deposit ETH. Anyone can withdraw whatever they deposited.

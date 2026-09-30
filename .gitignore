@@ -9,3 +9,5 @@ node_modules/
 broadcast/
 *.log
 results/
+deployed_contracts.json
+brag-output/work/

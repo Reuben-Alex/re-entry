@@ -17,6 +17,10 @@ CONTRACT_NAMES = [
     ("SafeVault.sol", "SafeVault"),
     ("VulnerableTreasury.sol", "VulnerableTreasury"),
     ("SafeTreasury.sol", "SafeTreasury"),
+    ("VulnerableBlind.sol", "VulnerableBlind"),
+    ("SafeBlind.sol", "SafeBlind"),
+    ("VulnerableOracleVault.sol", "VulnerableOracleVault"),
+    ("SafeOracleVault.sol", "SafeOracleVault"),
     ("Attacker.sol", "Attacker"),
 ]
 

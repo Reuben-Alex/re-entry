@@ -1,0 +1,1 @@
+Re-entry: an agent that proves smart-contract bugs by draining them in a sandbox — then writes the fix and proves that works too. Nemotron on Nebius Token Factory. Educational Anvil demo only; never a live chain.

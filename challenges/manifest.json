@@ -1,0 +1,115 @@
+{
+  "targets": [
+    {
+      "name": "VulnerableVault",
+      "tier": "train",
+      "vuln_class": "reentrancy",
+      "owasp": "SC05",
+      "source": "contracts/VulnerableVault.sol",
+      "control": "SafeVault"
+    },
+    {
+      "name": "SafeVault",
+      "tier": "control",
+      "vuln_class": "reentrancy",
+      "owasp": "SC05",
+      "source": "contracts/SafeVault.sol"
+    },
+    {
+      "name": "VulnerableTreasury",
+      "tier": "held_out_sealed",
+      "vuln_class": "access_control",
+      "owasp": "SC01",
+      "source": "challenges/sealed/VulnerableTreasurySealed.sol",
+      "contract_name": "VulnerableTreasury",
+      "control": "SafeTreasury"
+    },
+    {
+      "name": "SafeTreasury",
+      "tier": "control",
+      "vuln_class": "access_control",
+      "owasp": "SC01",
+      "source": "contracts/SafeTreasury.sol"
+    },
+    {
+      "name": "VulnerableEscrow",
+      "tier": "held_out_sealed",
+      "vuln_class": "logic",
+      "owasp": "SC01",
+      "source": "challenges/sealed/VulnerableEscrow.sol",
+      "control": "SafeEscrow"
+    },
+    {
+      "name": "SafeEscrow",
+      "tier": "control",
+      "vuln_class": "logic",
+      "owasp": "SC01",
+      "source": "contracts/SafeEscrow.sol"
+    },
+    {
+      "name": "VulnerableBlind",
+      "tier": "held_out_sealed",
+      "vuln_class": "access_control",
+      "owasp": "SC01",
+      "source": "challenges/sealed/VulnerableBlindSealed.sol",
+      "contract_name": "VulnerableBlind",
+      "control": "SafeBlind"
+    },
+    {
+      "name": "SafeBlind",
+      "tier": "control",
+      "vuln_class": "access_control",
+      "owasp": "SC01",
+      "source": "contracts/SafeBlind.sol"
+    },
+    {
+      "name": "FallbackBank",
+      "tier": "benchmark",
+      "vuln_class": "access_control",
+      "owasp": "SC01",
+      "source": "benchmarks/ethernaut_inspired/FallbackBank.sol",
+      "attribution": "Inspired by OpenZeppelin Ethernaut Fallback (MIT)",
+      "control": "SafeFallbackBank"
+    },
+    {
+      "name": "SafeFallbackBank",
+      "tier": "control",
+      "vuln_class": "access_control",
+      "owasp": "SC01",
+      "source": "benchmarks/ethernaut_inspired/SafeFallbackBank.sol",
+      "attribution": "Inspired by OpenZeppelin Ethernaut Fallback (MIT)"
+    },
+    {
+      "name": "NaiveFeeVault",
+      "tier": "benchmark",
+      "vuln_class": "logic",
+      "owasp": "SC01",
+      "source": "benchmarks/dvd_inspired/NaiveFeeVault.sol",
+      "attribution": "Inspired by Damn Vulnerable DeFi Naive receiver (MIT)",
+      "control": "SafeNaiveFeeVault"
+    },
+    {
+      "name": "SafeNaiveFeeVault",
+      "tier": "control",
+      "vuln_class": "logic",
+      "owasp": "SC01",
+      "source": "benchmarks/dvd_inspired/SafeNaiveFeeVault.sol",
+      "attribution": "Inspired by Damn Vulnerable DeFi Naive receiver (MIT)"
+    },
+    {
+      "name": "VulnerableOracleVault",
+      "tier": "train",
+      "vuln_class": "oracle_manipulation",
+      "owasp": "SC02",
+      "source": "contracts/VulnerableOracleVault.sol",
+      "control": "SafeOracleVault"
+    },
+    {
+      "name": "SafeOracleVault",
+      "tier": "control",
+      "vuln_class": "oracle_manipulation",
+      "owasp": "SC02",
+      "source": "contracts/SafeOracleVault.sol"
+    }
+  ]
+}

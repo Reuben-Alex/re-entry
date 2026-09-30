@@ -1,50 +1,160 @@
-# PoCForge
+# Re-entry
 
-An agent that proves smart-contract vulnerabilities exist by exploiting them
-in a forked sandbox — not by reading code for known patterns. Built for the
-Nebius x NVIDIA Global AI Hackathon, Coding & Agentic Engineering track.
+**An agent that proves smart-contract vulnerabilities by exploiting them in a
+sandbox — then writes the fix and proves *that* works too.**
+
+Built for the Nebius x NVIDIA Global AI Hackathon, Coding & Agentic
+Engineering track. Powered by NVIDIA Nemotron (Nano / Super / Ultra) on
+Nebius Token Factory, with Tavily for exploit-precedent grounding.
 
 Static analyzers and audits catch known bug *patterns*. They don't prove
 exploitability, and they don't chain a bug into a working attack — the step
-that separates a theoretical finding from a drained protocol. PoCForge forks
-real chain state into a sandbox, proposes an exploit chain grounded in real
-historical precedent (via Tavily), actually executes it, and — when it
-fails — feeds the real on-chain error back into the next attempt. It only
+that separates a theoretical finding from a drained contract. Re-entry
+compiles a target into a local EVM sandbox, has an LLM **write a fresh
+exploit contract from scratch**, actually executes it, and — when it fails —
+feeds the real on-chain revert reason back into the next attempt. It only
 reports a vulnerability once it has proven it by draining the funds itself,
-with a fully reproducible transaction trace as evidence.
+with a reproducible transaction trace as evidence. Then it generates a
+minimal patch, redeploys, and replays the same exploit to confirm the fix
+holds.
+
+**Lifecycle: find → prove → fix → verify.**
 
 MIT licensed. See [LICENSE](./LICENSE).
 
 ---
 
-## 1. What's built
+## Scope and ethics (read first)
 
-| Piece | Status |
-|---|---|
-| `contracts/*.sol` | **Complete.** Reentrancy vault pair, access-control treasury pair, fallback attacker. |
-| `orchestrator/chain.py` | **Complete.** Compile, deploy, localhost RPC guard, dynamic Solidity compile. |
-| `orchestrator/sandbox.py` | **Complete.** LocalSandbox (Anvil snapshot/revert) + ContreeSandbox wrapper. |
-| `orchestrator/recon.py` | **Complete.** ABI mapping + Nano risk flagging (regex fallback). |
-| `orchestrator/precedent.py` | **Complete.** Tavily critical path — precedent + revert research. |
-| `orchestrator/proposer.py` | **Complete.** Ultra generates Solidity exploit contracts + compile retry. |
-| `orchestrator/executor.py` | **Complete.** Deploy + execute generated exploits + Attacker.sol fallback. |
-| `orchestrator/loop.py` | **Complete.** Full propose → compile → execute → retry pipeline. |
-| `orchestrator/report.py` | **Complete.** Super evidence reports with honest verdict distinction. |
-| `scripts/run_pipeline.py` | **Complete.** Runs pipeline against all demo contracts. |
-| `scripts/benchmark_pipeline.py` | **Complete.** Measures fallback rate + timing (run before demo). |
-| `dashboard/app.py` | **Complete.** FastAPI + Jinja2 results dashboard. |
+This is a **self-contained, educational** smart-contract security demo.
 
-**Verdict values:** `vulnerable_agent_generated` | `vulnerable_fallback` | `no_exploit_found`
+- Every contract — the vulnerable target, its patched twin, and the exploit
+  contract — is either **authored by us** or a **permissively-licensed public
+  teaching benchmark** (attributed below). Nothing here is a real, deployed,
+  value-holding protocol.
+- Everything runs only on a **local/sandboxed EVM** (Anvil, or a Nebius
+  Sandboxes / Contree fork). There is a hard localhost guard on the RPC
+  connection ([`orchestrator/chain.py`](orchestrator/chain.py) `get_web3`).
+- There is **no interaction with any real chain, real funds, real user, or
+  third-party infrastructure**. Nothing here can reach mainnet or a public
+  testnet.
+- The purpose is demonstrating well-known, widely-taught vulnerability
+  classes (reentrancy — the 2016 DAO pattern — access control, escrow logic)
+  as a proof-of-concept for agentic security tooling, not building attack
+  capability against real systems.
 
-**Model split:** Nano (recon) → Ultra (exploit generation) → Super (report)
+Terms like "attacker," "exploit," and "drain" refer only to our own toy
+contracts (and clearly-attributed teaching benchmarks) in an isolated
+sandbox.
 
 ---
 
-## 2. Setup
+## 1. Status — verified, working
+
+The full pipeline runs end-to-end against real Nemotron models. Measured
+results ([`results/benchmark.json`](results/benchmark.json)):
+
+- **`VulnerableVault` (reentrancy): 3/3 agent-generated exploits succeed, 0
+  fallbacks.** Avg ~34s/run.
+- **`VulnerableTreasury` (access control): 3/3 agent-generated exploits
+  succeed, 0 fallbacks.** Avg ~13s/run.
+
+The generated exploit is genuinely LLM-authored (distinct from the
+hand-written [`Attacker.sol`](contracts/Attacker.sol) safety net), Nano flags
+the bug with correct reasoning, and Tavily returns real precedent (OWASP
+SC05, Nethermind, Pessimistic, etc.).
+
+**Verdict values** (honest by design — the pipeline decides, not the LLM):
+`vulnerable_agent_generated` | `vulnerable_fallback` | `no_exploit_found`
+
+**Model split:** Nano (recon) → Ultra (exploit + patch generation) → Super
+(evidence report)
+
+| Piece | What it does |
+|---|---|
+| `contracts/*.sol` | Vulnerable/patched pairs + exploit contracts (reentrancy, access control, escrow logic). |
+| `orchestrator/recon.py` | ABI mapping + Nano risk flagging (regex fallback). |
+| `orchestrator/precedent.py` | Tavily precedent + revert-error research. |
+| `orchestrator/proposer.py` | Ultra writes Solidity exploits from scratch, with compile-retry. |
+| `orchestrator/executor.py` | Deploys + runs generated exploits; hand-written fallback as safety net. |
+| `orchestrator/loop.py` | Full propose → compile → execute → retry → fallback pipeline. |
+| `orchestrator/patcher.py` | Ultra generates a minimal patch + unified diff. |
+| `orchestrator/patch_verify.py` | Redeploys patched contract, replays exploit, asserts it's blocked. |
+| `orchestrator/report.py` | Super evidence report with lifecycle story. |
+| `orchestrator/sandbox.py` / `contree_sandbox.py` | LocalSandbox (Anvil snapshot/revert) + Contree wrapper. |
+| `dashboard/app.py` | FastAPI + Jinja2 live results dashboard. |
+| `scripts/benchmark_pipeline.py` | Measures agent success rate + timing (run before demo). |
+
+---
+
+## 2. How it works
+
+```
+recon (Nano) → risk ranking → precedent search (Tavily)
+   → exploit proposal (Ultra) → sandbox execution (Anvil/Contree)
+   → outcome check → [fail: retry with real revert reason + Tavily, bounded]
+   → [success: patch (Ultra) → redeploy → replay same exploit → verify blocked]
+   → evidence report (Super) → dashboard
+```
+
+Why one piece *must* be Solidity: reentrancy hijacks execution mid-transaction
+the instant ETH arrives, via a contract's `receive()`. Off-chain Python
+cannot inject itself into an in-flight transaction — only another contract
+can. Everything else (deploy, call, read balances, decide success) is Python
+via `web3.py`.
+
+One-command local demo:
+
+```bash
+bash scripts/demo.sh
+```
+
+---
+
+## 3. The vulnerability corpus (hybrid)
+
+Re-entry runs against a tiered corpus so judges can see both honesty and
+breadth:
+
+- **Authored targets (the honesty anchor).** Our own vulnerable/patched
+  pairs, including a freshly-written **held-out** contract the model has never
+  seen — this is what proves the agent reasons rather than pattern-matches a
+  memorized answer.
+- **Attributed public benchmarks (breadth).** A slice of permissively-licensed
+  teaching sets — [Ethernaut](https://github.com/OpenZeppelin/ethernaut)
+  (MIT), [Damn Vulnerable DeFi](https://github.com/theredguild/damn-vulnerable-defi)
+  (MIT), [SmartBugs-Curated](https://github.com/smartbugs/smartbugs-curated),
+  and [EVMbench](https://www.arxiv.org/pdf/2603.04915) — used to report a
+  comparable, quantitative score. (Note: classic sets like Ethernaut/DVD are
+  likely in the model's training data, so they measure coverage, not blind
+  reasoning; the authored held-out contract is what does that.)
+- **Canonical safe templates (the patch target).** Correct patches should
+  converge toward the audited
+  [OpenZeppelin Contracts](https://github.com/OpenZeppelin/openzeppelin-contracts)
+  patterns — `ReentrancyGuard`/`nonReentrant`, `Ownable`/`AccessControl`,
+  `SafeERC20`, `PullPayment`. The report highlights when the generated fix
+  matches the OpenZeppelin-audited pattern.
+- **Taxonomy.** Findings are labeled against the current
+  [OWASP Smart Contract Top 10 (2025)](https://owasp.org/www-project-smart-contract-top-10/)
+  and DASP Top 10. (The older SWC Registry is frozen — not updated since 2020
+  — so it's cited only as historical reference.)
+
+Challenge tiers ([`challenges/manifest.json`](challenges/manifest.json)):
+
+| Tier | Examples | In repo |
+|------|----------|---------|
+| `train` | VulnerableVault | Full source in `contracts/` |
+| `held_out_sealed` | VulnerableTreasury, VulnerableEscrow | Comment-free `challenges/sealed/` |
+| `held_out_live` | Fresh blind contract | `.sol` in `challenges/held_out/` (gitignored until demo) |
+| `control` | SafeVault, SafeTreasury, SafeEscrow | Negative tests — should report `no_exploit_found` |
+
+---
+
+## 4. Setup
 
 ### Prerequisites
 - Python 3.10+
-- [Foundry](https://book.getfoundry.sh/getting-started/installation) (gives you the `anvil` local EVM node)
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) (provides `anvil`)
 - A Nebius Token Factory API key
 - A Tavily API key
 
@@ -59,163 +169,123 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# fill in NEBIUS_API_KEY, TAVILY_API_KEY in .env
+# fill in NEBIUS_API_KEY and TAVILY_API_KEY in .env
 ```
 
-### First run — local development loop
+### Environment variables
+
+All in `.env` — see [`.env.example`](.env.example) for the full annotated
+list. The two you must set: `NEBIUS_API_KEY`, `TAVILY_API_KEY`.
+`CONTREE_API_TOKEN` / `CONTREE_PROJECT_ID` can stay blank until you move from
+local Anvil to Contree sandboxes.
+
+Nemotron model IDs (verified against the
+[Nebius model catalog](https://tokenfactory.nebius.com/model-catalog.md) —
+IDs are case-sensitive, use **Copy model ID** in the console):
+
+| Role | Model | `MODEL_*` value | Region |
+|------|-------|-----------------|--------|
+| Recon (Nano) | Nemotron-3-Nano-30B-A3B | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | eu-north1 |
+| Report (Super) | Nemotron-3-Super-120B-A12B | `nvidia/nemotron-3-super-120b-a12b` | us-central1 |
+| Exploit + patch (Ultra) | Nemotron-3-Ultra-550B-A55B | `nvidia/Nemotron-3-Ultra-550b-a55b` | us-central1 |
+
+> Never commit `.env`. It is gitignored. If a key is ever exposed, rotate it
+> in the Nebius / Tavily consoles.
+
+---
+
+## 5. Running it
 
 ```bash
 # terminal 1
 anvil
 
-# terminal 2
-python scripts/deploy_demo_contracts.py     # deploys + funds VulnerableVault and SafeVault
-python scripts/manual_exploit_check.py      # confirms the bug is real, no LLM involved
+# terminal 2 — use the project venv (system python3 lacks solcx)
+source .venv/bin/activate
+pip install -r requirements.txt             # once
+
+python scripts/deploy_demo_contracts.py     # deploys + funds demo contracts
+python scripts/manual_exploit_check.py      # confirms reentrancy bug, no LLM
+python scripts/run_pipeline.py              # full agent pipeline (needs API keys)
+python scripts/benchmark_pipeline.py 25     # measure agent success rate before demo
+
+# dashboard (demo URL)
+uvicorn dashboard.app:app --reload --port 8000
 ```
 
-If `manual_exploit_check.py` prints `CONFIRMED: exploit drains the vault`,
-you're ready to start building the agent pipeline against a target you know
-is genuinely exploitable.
+If `manual_exploit_check.py` prints `CONFIRMED: exploit drains the vault`, the
+sandbox target is verified. Run `benchmark_pipeline.py` before submitting and
+state the result: "Ultra succeeds without fallback in N/M runs."
 
----
+Run by tier:
 
-## 3. Environment variables
+```bash
+python scripts/run_pipeline.py --tier train
+python scripts/run_pipeline.py --tier held_out_sealed
+python scripts/run_pipeline.py --tiers train,held_out_sealed
 
-All in `.env` — see `.env.example` for the full list with comments. The two
-you must fill in before anything works: `NEBIUS_API_KEY`, `TAVILY_API_KEY`.
-`CONTREE_API_TOKEN` / `CONTREE_PROJECT_ID` can stay blank until you move
-from local Anvil to real Contree sandboxes (see `orchestrator/sandbox.py`).
-
-Confirm the exact Nemotron model identifiers in `.env.example`
-(`MODEL_NANO` / `MODEL_SUPER` / `MODEL_ULTRA`) against the current Nebius
-Token Factory model catalog before running — these are placeholders and the
-exact strings may differ.
-
----
-
-## 4. The Solidity you need to understand (written for a Python-first reader)
-
-You don't need to become a Solidity expert to finish this project — the
-three contracts in `contracts/` are **already written and working**. This
-section explains what they do and why, so you're not flying blind when you
-build the agent that reasons about them.
-
-### Why Solidity has to exist in this project at all
-
-Everything else in this repo is Python. Solidity shows up in exactly two
-places, both unavoidable:
-
-1. **The target contracts** (`VulnerableVault.sol` / `SafeVault.sol`) —
-   this is what your agent is trying to exploit. It has to be real,
-   deployed bytecode on a real (forked/local) chain, because the whole
-   point of the project is *proving* exploitability by execution, not by
-   reading source and guessing.
-2. **The attacker contract** (`Attacker.sol`) — this is the one piece that
-   genuinely cannot be Python. Reentrancy exploits work by hijacking
-   execution *in the middle of* another transaction, the instant ETH
-   arrives at an address. Only a smart contract's `receive()` function can
-   be triggered automatically like that by the EVM itself — Python code
-   outside the chain has no way to insert itself mid-transaction.
-
-Everything else — deploying these contracts, calling their functions,
-checking balances before/after, deciding whether an attack worked — is
-driven entirely from Python via `web3.py`. You are not expected to write
-more Solidity than what's already here for the demo target; if you later
-want to test the agent against different vulnerability types, that's where
-you'd add more contracts, following the same pattern.
-
-### `VulnerableVault.sol` — the bug, in plain terms
-
-A "vault" that lets anyone deposit ETH and withdraw what they deposited.
-The bug: when you withdraw, the contract **sends you the ETH before it
-updates its own record of your balance**. If the withdrawer is a contract
-(not a wallet), sending it ETH automatically triggers that contract's code
-— and if that code calls `withdraw()` again *before* the first call
-finishes, the vault still thinks you have your original balance, and pays
-out again. Repeat until the vault is empty. This is the exact bug shape
-behind the 2016 DAO hack and a large share of reentrancy exploits since.
-
-### `SafeVault.sol` — the fix
-
-Identical contract, one line moved: the balance is set to zero **before**
-sending the ETH, not after. Now a repeat call sees a zero balance and stops
-immediately. This is the standard "checks-effects-interactions" pattern —
-check your conditions, update your own state, *then* talk to the outside
-world. This is your agent's control case: it should try, fail, and
-correctly conclude "no exploit found" against this contract.
-
-### `Attacker.sol` — the exploit
-
-A small contract that: (1) deposits into the vault, (2) calls `withdraw()`
-to start the exploit, and (3) has a `receive()` function that automatically
-fires when ETH arrives — which calls `withdraw()` again, exploiting the bug
-above, as many times as the vault's remaining balance allows.
-
-### What you do NOT need to write yourself
-
-For the hackathon's core demo, all three contracts above are done. You
-won't need to write new Solidity unless you choose to extend the project to
-new vulnerability types (oracle manipulation, access control bugs, etc.) as
-a stretch goal — if you do, follow the same "vulnerable / patched / (if
-needed) attacker" pattern established here.
-
-### Compiling and deploying — already handled
-
-You don't hand-compile anything. `orchestrator/chain.py`'s
-`compile_contract()` calls `py-solc-x` to turn a `.sol` file into an ABI +
-bytecode pair, and `deploy()` sends that to whatever RPC endpoint you point
-it at (local Anvil, or later, a Contree sandbox running Anvil). See
-`scripts/deploy_demo_contracts.py` for a complete working example.
-
----
-
-## 5. Architecture recap
-
-```
-recon (Nano) -> risk ranking (Nano) -> precedent search (Tavily)
-   -> exploit proposal (Ultra) -> sandbox execution (Contree/Anvil)
-   -> outcome check -> [fail: retry via Tavily + Ultra, bounded attempts]
-   -> [success: evidence report (Super)] -> dashboard (Serverless Endpoint)
+# blind run, source not printed
+bash scripts/held_out_demo.sh
+TIER=held_out_live bash scripts/held_out_demo.sh
 ```
 
-Full architecture rationale, judging-criteria mapping, and demo script are
-in the project plan doc (kept alongside this repo / shared with the team
-separately) — this README is the "how do I actually build it" companion to
-that doc.
+**Recommended judge flow:**
+1. **VulnerableVault** (`train`) — reentrancy, full lifecycle in the dashboard **Story** tab.
+2. **Held-out suite** — Treasury + Escrow sealed targets (source not shown).
+3. **SafeVault** (`control`) — should honestly report `no_exploit_found`.
 
 ---
 
-## 6. Moving from local Anvil to Nebius Sandboxes (Contree)
+## 6. Nebius Sandboxes (Contree) — optional cloud isolation
 
-Develop and debug everything against plain local `anvil` first — it's
-faster to iterate on and has no external dependencies. Once the full
-pipeline works end-to-end locally:
+Re-entry supports cloud-isolated EVM execution via **Nebius Sandboxes**
+(Contree). Set `SANDBOX_MODE=contree` in `.env` once credentials are set.
 
-1. Read `/mnt/skills` — n/a here; instead see the Contree SDK examples at
-   https://github.com/nebius/contree-sdk (the `examples/` directory covers
-   session management, image operations, and branching workflows
-   specifically).
-2. Build an OCI base image with Anvil + this repo's Python deps
-   pre-installed.
-3. Implement `ContreeSandbox` in `orchestrator/sandbox.py` against the same
-   interface `LocalSandbox` already exposes (`fork_checkpoint`,
-   `run_tx_sequence`, `rollback`) — the checkpoint/branch model maps
-   directly onto that retry loop: fork before each attempt, roll back
-   instantly on failure instead of re-deploying.
-4. Keep `LocalSandbox` as a fallback path. Sandboxes/Contree is currently
-   in **Beta** — don't let it be a single point of failure minutes before a
-   demo.
+- **Token:** your `NEBIUS_API_KEY` (or request early access at
+  [contree.dev](https://contree.dev) — Sandboxes is in beta).
+- **Project ID:** Nebius console → your project → **Project ID**.
+- **Verify:** `python scripts/contree_check.py`.
+
+[`orchestrator/contree_sandbox.py`](orchestrator/contree_sandbox.py)
+bootstraps an Ubuntu container with Foundry + Anvil, uploads the repo, deploys
+demo contracts, and uses Contree's Git-like branching for retry rollback.
+First bootstrap is slow (~5-10 min); later runs reuse the `re-entry-bootstrap`
+image.
+
+> Contree is in **beta** and can return 403 without Sandboxes access. Keep
+> `LocalSandbox` (Anvil) as the fallback — don't make Contree a single point
+> of failure minutes before a demo. Local Anvil + Token Factory already
+> satisfies the "runs on Nebius Token Factory + uses an NVIDIA open model"
+> requirement.
+
+Docs: [Sandboxes overview](https://docs.tokenfactory.nebius.com/sandboxes/overview.md)
+| [Contree branching](https://docs.tokenfactory.nebius.com/sandboxes/sdk/python_sdk/branching.md)
 
 ---
 
-## 7. Submission checklist (Devpost)
+## 7. Demo videos
 
-- [ ] Working project using ≥1 NVIDIA open source model on Token Factory ✅ (Nemotron Nano/Ultra/Super)
+Two separate assets:
+
+- **Launch/hook video** (15-25s) via the `/brag` skill — a punchy, shareable
+  promo generated from the project. Great for Design and social reach.
+- **Submission demo** (≤3 min, public YouTube) — the required video. Its
+  audio must **explicitly name where Token Factory and Nemotron Nano/Ultra/
+  Super are used** at each step. Walk through: agent-generated drain →
+  held-out target → SafeVault control → patch + replay verification.
+
+---
+
+## 8. Submission checklist (Devpost)
+
+- [ ] Working project using ≥1 NVIDIA open-source model on Token Factory (Nemotron Nano/Super/Ultra)
 - [ ] Category: Coding & Agentic Engineering
-- [ ] Project description (what/why/how)
-- [ ] Working demo URL — `dashboard/app.py` deployed as a Nebius Serverless Endpoint
-- [ ] Demo video, ≤3 min, public YouTube, **audio must explicitly name how Token Factory and Nemotron were used** at the relevant moments
-- [ ] Public repo with OSS license visible at the top (this repo ships with MIT — see `LICENSE`)
-- [ ] README with setup instructions (this file) — highlight Nemotron/Token Factory/Contree/Tavily usage (done above)
-- [ ] Feedback on Token Factory / AI Cloud / NVIDIA tools — jot friction points as you hit them during the build, don't leave this to the last minute
-- [ ] Consider Tavily-specific writeup for the separate Best Use of Tavily prize
+- [ ] Project description mapped to the four judging criteria — see [docs/DEVPOST.md](docs/DEVPOST.md)
+- [ ] Working demo URL — local or Docker ([deploy/README.md](deploy/README.md)); Nebius Serverless Endpoint recommended
+- [ ] Demo video ≤3 min — follow [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md); audio names Token Factory + Nemotron
+- [ ] Launch/hook clip (optional) — `brag-output/brag.mp4` from `/brag`
+- [ ] Public repo with OSS license visible (MIT — see [LICENSE](LICENSE)); rotate keys first ([docs/KEY_ROTATION.md](docs/KEY_ROTATION.md))
+- [ ] README with setup + architecture (this file)
+- [ ] Token Factory / AI Cloud / NVIDIA feedback captured during the build
+- [ ] Separate Best Use of Tavily writeup — [docs/TAVILY.md](docs/TAVILY.md)
+- [ ] Benchmark attribution — [benchmarks/THIRD_PARTY_LICENSES.md](benchmarks/THIRD_PARTY_LICENSES.md)

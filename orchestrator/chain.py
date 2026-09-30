@@ -59,6 +59,13 @@ def compile_contract(filename: str, contract_name: str) -> tuple[list, str]:
     return _extract_contract(normalize_pragma(source), contract_name)
 
 
+def compile_contract_path(source_path: Path, contract_name: str) -> tuple[list, str]:
+    """Compile a .sol file at an arbitrary path. Returns (abi, bytecode)."""
+    ensure_solc()
+    source = source_path.read_text()
+    return _extract_contract(normalize_pragma(source), contract_name)
+
+
 def compile_source_code(source_code: str, contract_name: str) -> tuple[list, str]:
     """Compile raw Solidity source (not from file). Returns (abi, bytecode)."""
     ensure_solc()

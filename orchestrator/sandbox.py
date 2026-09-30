@@ -1,5 +1,5 @@
 """
-Sandbox orchestration — local Anvil and optional Contree execution.
+Sandbox orchestration — local Anvil and Nebius Contree execution.
 """
 from dataclasses import dataclass, field
 
@@ -68,39 +68,10 @@ class LocalSandbox:
             raise RuntimeError(str(exc)) from exc
 
 
-class ContreeSandbox(LocalSandbox):
-    """
-    Nebius Contree sandbox — delegates to local Anvil RPC when Contree
-    exposes one, otherwise uses LOCAL_RPC_URL as configured endpoint.
-
-    Contree SDK is beta; this class validates credentials and reuses the
-    LocalSandbox interface so the pipeline stays mode-agnostic.
-    """
-
-    def __init__(self, rpc_url: str | None = None):
-        if not config.CONTREE_API_TOKEN:
-            raise ValueError(
-                "CONTREE_API_TOKEN required when SANDBOX_MODE=contree"
-            )
-        if not config.CONTREE_PROJECT_ID:
-            raise ValueError(
-                "CONTREE_PROJECT_ID required when SANDBOX_MODE=contree"
-            )
-        self._contree = None
-        try:
-            from contree_sdk import Contree
-
-            self._contree = Contree(api_token=config.CONTREE_API_TOKEN)
-        except ImportError as exc:
-            raise ImportError(
-                "contree-sdk is required for SANDBOX_MODE=contree"
-            ) from exc
-        endpoint = rpc_url or config.LOCAL_RPC_URL
-        super().__init__(rpc_url=endpoint)
-
-
 def create_sandbox():
     """Factory: return LocalSandbox or ContreeSandbox based on config."""
     if config.SANDBOX_MODE.lower() == "contree":
+        from orchestrator.contree_sandbox import ContreeSandbox
+
         return ContreeSandbox()
     return LocalSandbox()

@@ -3,62 +3,964 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PoCForge — Security Assessment Results</title>
+  <title>Re-entry — Agentic Smart Contract Security</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 2rem; background: #0f1117; color: #e6edf3; }
-    h1 { color: #58a6ff; }
-    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-    .badge-vuln { background: #238636; color: #fff; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: bold; }
-    .badge-fallback { background: #9e6a03; color: #fff; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: bold; }
-    .badge-secure { background: #da3633; color: #fff; padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: bold; }
-    pre { background: #0d1117; border: 1px solid #30363d; padding: 1rem; overflow-x: auto; font-size: 0.85rem; border-radius: 6px; }
-    details { margin-top: 1rem; }
-    summary { cursor: pointer; color: #58a6ff; }
-    a { color: #58a6ff; }
-    footer { margin-top: 2rem; color: #8b949e; font-size: 0.9rem; }
-    .meta { color: #8b949e; font-size: 0.9rem; }
+    :root {
+      --bg: #08080a;
+      --surface: #111114;
+      --surface2: #18181c;
+      --border: #27272a;
+      --text: #fafafa;
+      --muted: #a1a1aa;
+      --dim: #71717a;
+      --accent: #c4a574;
+      --green: #4ade80;
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --blue: #60a5fa;
+      --purple: #a78bfa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Site header */
+    .site-header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(8,8,10,.85);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: .85rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -.02em;
+    }
+    .logo span { color: var(--accent); }
+    .status-pills { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .pill {
+      font-size: .7rem;
+      padding: .25rem .6rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .pill.ok { border-color: rgba(74,222,128,.3); color: var(--green); }
+    .pill.bad { border-color: rgba(248,113,113,.3); color: var(--red); }
+
+    .compact-bar {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: .5rem 1.5rem;
+      font-size: .78rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .compact-bar summary { cursor: pointer; color: var(--accent); }
+
+    /* Main grid */
+    .workspace {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: .75rem 1.5rem 1rem;
+      display: grid;
+      grid-template-columns: 260px 1fr 360px;
+      gap: .75rem;
+      height: calc(100vh - 56px);
+      max-height: calc(100vh - 56px);
+    }
+    @media (max-width: 1100px) {
+      .workspace { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      max-height: 100%;
+    }
+    .sidebar-panel { position: relative; }
+    .target-group-label {
+      font-size: .65rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--dim);
+      padding: .5rem .75rem .25rem;
+    }
+    .actions-sticky {
+      position: sticky;
+      bottom: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      z-index: 2;
+    }
+    .intel-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .intel-tab {
+      flex: 1;
+      padding: .55rem .35rem;
+      font-size: .65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border: none;
+      background: transparent;
+      color: var(--dim);
+      cursor: pointer;
+    }
+    .intel-tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+    .story-beat { margin-bottom: .75rem; }
+    .story-beat h4 { font-size: .68rem; color: var(--accent); margin-bottom: .25rem; text-transform: uppercase; }
+    .story-beat p { font-size: .78rem; color: var(--muted); line-height: 1.5; }
+    .panel-head {
+      padding: .75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: .72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Targets sidebar */
+    .target-list { padding: .5rem; flex: 1; overflow-y: auto; }
+    .target-btn {
+      width: 100%;
+      text-align: left;
+      padding: .75rem;
+      margin-bottom: .35rem;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      font-family: inherit;
+      transition: background .15s, border-color .15s;
+    }
+    .target-btn:hover { background: var(--surface2); }
+    .target-btn.active {
+      border-color: var(--accent);
+      background: rgba(196,165,116,.08);
+    }
+    .target-btn .name { font-weight: 600; font-size: .85rem; display: block; }
+    .target-btn .desc { font-size: .7rem; color: var(--dim); margin-top: .2rem; }
+    .target-btn .badge {
+      float: right;
+      font-size: .65rem;
+      padding: .1rem .4rem;
+      border-radius: 4px;
+      margin-top: .1rem;
+    }
+    .badge-ok { background: rgba(74,222,128,.12); color: var(--green); }
+    .badge-warn { background: rgba(251,191,36,.12); color: var(--yellow); }
+    .badge-fail { background: rgba(248,113,113,.12); color: var(--red); }
+
+    .actions { padding: .75rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: .5rem; }
+    .btn {
+      padding: .65rem 1rem;
+      border-radius: 8px;
+      border: none;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: .8rem;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #111; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-run { background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); color: #052e16; }
+
+    /* Terminal */
+    .terminal-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .terminal-chrome {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .5rem .85rem;
+      background: #0a0a0c;
+      border-bottom: 1px solid var(--border);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .68rem;
+      color: var(--dim);
+    }
+    .terminal {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .76rem;
+      line-height: 1.7;
+      background: #0a0a0c;
+    }
+    .terminal .line { margin-bottom: .1rem; word-break: break-word; }
+    .terminal .cmd { color: var(--accent); }
+    .terminal .cmd::before { content: '$ '; color: var(--green); }
+    .terminal .info { color: var(--blue); }
+    .terminal .success { color: var(--green); }
+    .terminal .error { color: var(--red); }
+    .terminal .warn { color: var(--yellow); }
+    .terminal .dim { color: var(--dim); font-size: .72rem; }
+    .terminal .section { color: var(--purple); font-weight: 600; margin-top: .6rem; text-transform: uppercase; font-size: .68rem; letter-spacing: .05em; }
+    .cursor { display: inline-block; width: 7px; height: 1em; background: var(--accent); animation: blink 1s step-end infinite; vertical-align: text-bottom; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Intelligence panel */
+    .intel-body { flex: 1; overflow-y: auto; padding: 1rem; }
+    .intel-section { margin-bottom: 1.25rem; }
+    .intel-section h3 {
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--dim);
+      margin-bottom: .6rem;
+    }
+    .source-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .85rem;
+      margin-bottom: .6rem;
+    }
+    .source-card .title {
+      font-size: .82rem;
+      font-weight: 600;
+      margin-bottom: .35rem;
+      line-height: 1.4;
+    }
+    .source-card .title a { color: var(--blue); text-decoration: none; }
+    .source-card .title a:hover { text-decoration: underline; }
+    .source-card .snippet {
+      font-size: .75rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .source-card .tag {
+      display: inline-block;
+      margin-top: .5rem;
+      font-size: .62rem;
+      padding: .15rem .45rem;
+      border-radius: 4px;
+      background: rgba(96,165,250,.12);
+      color: var(--blue);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .risk-box {
+      background: rgba(167,139,250,.08);
+      border: 1px solid rgba(167,139,250,.2);
+      border-radius: 8px;
+      padding: .85rem;
+      font-size: .78rem;
+      line-height: 1.55;
+    }
+    .risk-box strong { color: var(--purple); }
+    .derivation {
+      background: rgba(196,165,116,.06);
+      border-left: 3px solid var(--accent);
+      padding: .75rem 1rem;
+      font-size: .78rem;
+      color: var(--muted);
+      line-height: 1.55;
+      border-radius: 0 8px 8px 0;
+    }
+    .verdict-card {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+    }
+    .verdict-card.success { border-color: rgba(74,222,128,.3); background: rgba(74,222,128,.05); }
+    .verdict-card.warn { border-color: rgba(251,191,36,.3); background: rgba(251,191,36,.05); }
+    .verdict-card.fail { border-color: rgba(248,113,113,.3); background: rgba(248,113,113,.05); }
+    .verdict-card h2 { font-size: 1rem; margin-bottom: .25rem; }
+    .verdict-card p { font-size: .78rem; color: var(--muted); }
+    .empty-intel {
+      color: var(--dim);
+      font-size: .8rem;
+      text-align: center;
+      padding: 2rem 1rem;
+      line-height: 1.6;
+    }
+    pre.exploit {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .68rem;
+      background: #0a0a0c;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .75rem;
+      overflow-x: auto;
+      max-height: 200px;
+      color: var(--green);
+      white-space: pre-wrap;
+    }
+
+    .site-footer {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem 2rem;
+      font-size: .72rem;
+      color: var(--dim);
+      text-align: center;
+    }
+    .benchmark-banner {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 1.5rem .5rem;
+      font-size: .78rem;
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .run-summary {
+      max-width: 1400px;
+      margin: .5rem auto 0;
+      padding: 0 1.5rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: .75rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .run-summary span { color: var(--muted); }
+    .run-summary .n-agent { color: var(--green); }
+    .run-summary .n-fallback { color: var(--yellow); }
+    .run-summary .n-fail { color: var(--red); }
+    .attempt-timeline { margin-top: .75rem; }
+    .attempt-row {
+      font-size: .72rem;
+      padding: .45rem .6rem;
+      border-left: 2px solid var(--border);
+      margin-bottom: .35rem;
+      color: var(--muted);
+    }
+    .attempt-row.ok { border-color: var(--green); }
+    .attempt-row.fail { border-color: var(--red); }
+    .btn-link {
+      display: inline-block;
+      margin-top: .5rem;
+      font-size: .75rem;
+      color: var(--blue);
+      text-decoration: none;
+    }
+    .btn-link:hover { text-decoration: underline; }
+    .patch-pill { display: inline-block; padding: .2rem .5rem; border-radius: 4px; font-size: .7rem; margin-top: .35rem; }
+    .patch-pill.ok { background: rgba(34,197,94,.15); color: var(--green); }
+    .patch-pill.fail { background: rgba(239,68,68,.15); color: var(--red); }
+    .patch-diff { font-size: .68rem; max-height: 200px; overflow: auto; background: var(--bg); padding: .5rem; border-radius: 4px; }
   </style>
 </head>
 <body>
-  <h1>PoCForge</h1>
-  <p class="meta">Agentic smart contract vulnerability verification — educational sandbox demo</p>
 
-  {% for name, report in results.items() %}
-  <div class="card">
-    <h2>{{ name }} <span class="{{ report.verdict_css }}">{{ report.verdict_label }}</span></h2>
-    <p>{{ report.verdict_explanation }}</p>
-    <p class="meta">
-      Class: {{ report.vulnerability_class | default('unknown') }} |
-      Drain: {{ report.drain_amount_wei | default(0) }} wei |
-      Attempts: {{ report.attempts | default(0) }} |
-      Fallback: {{ report.used_fallback | default(false) }}
-    </p>
-    {% if report.summary %}
-    <p><strong>Summary:</strong> {{ report.summary }}</p>
-    {% endif %}
-    {% if report.evidence %}
-    <p><strong>Evidence:</strong> {{ report.evidence }}</p>
-    {% endif %}
-
-    <details>
-      <summary>Generated exploit source</summary>
-      <pre><code>{{ report.generated_exploit_source | default('N/A') }}</code></pre>
-    </details>
-
-    <details>
-      <summary>Tavily precedent citations</summary>
-      <p>{{ report.precedent_citation | default('No citations') }}</p>
-    </details>
-
-    <details>
-      <summary>Attempt history ({{ report.attempt_history | length }} attempts)</summary>
-      <pre><code>{{ report.attempt_history | tojson(indent=2) }}</code></pre>
-    </details>
+<header class="site-header">
+  <div class="header-inner">
+    <div class="logo">Re-<span>entry</span></div>
+    <div class="status-pills">
+      <span class="pill {% if anvil.connected %}ok{% else %}bad{% endif %}" id="pill-anvil">anvil ●</span>
+      <span class="pill {% if contree.connected %}ok{% else %}bad{% endif %}" id="pill-contree">sandboxes ●</span>
+      <span class="pill ok" id="pill-mode">{{ sandbox_mode }}</span>
+      <span class="pill ok">nemotron</span>
+      <span class="pill ok">tavily</span>
+    </div>
   </div>
-  {% endfor %}
+</header>
 
-  <footer>
-    Powered by Nemotron Nano / Ultra / Super on Nebius Token Factory + Tavily
-  </footer>
+<div class="compact-bar">
+  Find → prove → fix → verify
+  {% if benchmark and benchmark.headline %} · <strong>{{ benchmark.headline }}</strong>{% endif %}
+  {% if summary and summary.total %} · live: {{ summary.headline }}{% endif %}
+  <details style="display:inline;margin-left:.5rem"><summary>About</summary>
+  Agent-generated exploits are the primary claim. Fallback is a labeled ABI safety net only.
+  Held-out / Blind targets require multi-step privilege escalation the safety net will not perform.
+  Benchmark tier = attributed teaching patterns (coverage, not blind). Nemotron + Tavily + Anvil.
+  </details>
+</div>
+
+<main class="workspace">
+  <aside class="panel sidebar-panel">
+    <div class="panel-head">Challenges</div>
+    <div class="target-list" id="target-list">
+      {% for label, group in [('Train', challenge_groups.train), ('Held-out', challenge_groups.held_out), ('Benchmark', challenge_groups.benchmark), ('Controls', challenge_groups.control)] %}
+      {% if group %}
+      <div class="target-group-label">{{ label }}</div>
+      {% for row in group %}
+      <button class="target-btn{% if loop.first and label == 'Train' %} active{% endif %}" data-target="{{ row.name }}">
+        {% set saved = targets | selectattr('contract_name', 'equalto', row.name) | list %}
+        {% if saved and saved[0].verdict_status != 'fail' %}
+        <span class="badge badge-{{ saved[0].verdict_status }}">{{ saved[0].verdict_icon }}</span>
+        {% endif %}
+        <span class="name">{{ row.name }}</span>
+        <span class="desc">{{ row.vuln_class }}{% if label == 'Held-out' %} · sealed{% elif label == 'Benchmark' %} · attributed{% endif %}</span>
+      </button>
+      {% endfor %}
+      {% endif %}
+      {% endfor %}
+    </div>
+    <div class="actions actions-sticky">
+      <button class="btn btn-secondary" id="btn-deploy">Deploy all</button>
+      <button class="btn btn-run" id="btn-run">▶ Run selected</button>
+      <button class="btn btn-secondary" id="btn-run-suite">▶ Run held-out suite</button>
+    </div>
+  </aside>
+
+  <!-- Center: terminal -->
+  <section class="panel terminal-wrap">
+    <div class="terminal-chrome">
+      <span class="dot dot-r"></span>
+      <span class="dot dot-y"></span>
+      <span class="dot dot-g"></span>
+      <span class="terminal-title">agent session · <span id="active-target">{{ target_list[0] }}</span></span>
+    </div>
+    <div class="terminal" id="terminal">
+      <div class="line dim">Re-entry agent ready. Select a target and click Run agent live.</div>
+      <div class="line dim">Requires Anvil at {{ anvil.rpc }} {% if not anvil.connected %}— not connected{% endif %}</div>
+      <div class="line cmd">_</div><span class="cursor"></span>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">Results</div>
+    <div class="intel-tabs">
+      <button type="button" class="intel-tab active" data-tab="story">Story</button>
+      <button type="button" class="intel-tab" data-tab="decision">Decision log</button>
+      <button type="button" class="intel-tab" data-tab="solution">Solution</button>
+      <button type="button" class="intel-tab" data-tab="exploit">Exploit</button>
+      <button type="button" class="intel-tab" data-tab="research">Research</button>
+    </div>
+    <div class="intel-body" id="intel-panel">
+      <div class="empty-intel" id="intel-empty">
+        Run the agent to see Tavily precedent sources, risk analysis, and how the exploit strategy was derived.
+      </div>
+      <div id="intel-content" style="display:none"></div>
+    </div>
+  </aside>
+</main>
+
+<footer class="site-footer">
+  Educational sandbox demo · Nemotron on Nebius Token Factory · Never targets live chains
+</footer>
+
+<script>
+  const TARGETS = {{ target_list | tojson }};
+  const SAVED = {{ targets | tojson }};
+  const HELD_OUT = {{ held_out | tojson if held_out else 'null' }};
+
+  const _activeBtn = document.querySelector('.target-btn.active');
+  let selectedTarget = _activeBtn ? _activeBtn.dataset.target : TARGETS[0];
+  let running = false;
+  let intelState = {};
+  const terminal = document.getElementById('terminal');
+  const intelPanel = document.getElementById('intel-content');
+  const intelEmpty = document.getElementById('intel-empty');
+
+  const VERDICT_UI = {
+    vulnerable_agent_generated: { label: 'Exploit confirmed', sub: 'Agent-generated contract drained the target', status: 'success', icon: '✓' },
+    vulnerable_fallback: { label: 'Safety-net fallback', sub: 'ABI safety net after agent retries — labeled, not the primary claim', status: 'warn', icon: '⚠' },
+    no_exploit_found: { label: 'No exploit found', sub: 'Agent exhausted retries', status: 'fail', icon: '✗' },
+  };
+
+  function reportToIntel(r, target) {
+    const v = r.verdict || 'no_exploit_found';
+    const meta = VERDICT_UI[v] || VERDICT_UI.no_exploit_found;
+    const flags = r.risk_flags || [];
+    return {
+      contract_name: target,
+      verdict: v,
+      verdict_label: meta.label,
+      verdict_sub: r.verdict_explanation || meta.sub,
+      verdict_status: meta.status,
+      verdict_icon: v.includes('vulnerable') ? meta.icon : '✗',
+      drain_eth: ((r.drain_amount_wei || 0) / 1e18).toFixed(2),
+      total_s: r.total_pipeline_s,
+      precedent_sources: r.precedent_sources || [],
+      risk_primary: flags[0] || {},
+      generated_exploit_source: r.generated_exploit_source,
+      attempt_history: r.attempt_history,
+      has_foundry_poc: !!r.foundry_poc,
+      has_patch: !!(r.patch || r.patch_diff),
+      patch_verified: r.patch_verified,
+      patch_status: r.patch_status,
+      patch_diff: r.patch_diff,
+      patch_reasoning: r.patch_reasoning,
+      patch: r.patch,
+      reasoning: null,
+      lifecycle_story: r.lifecycle_story || null,
+    };
+  }
+
+  let activeIntelTab = 'story';
+  document.querySelectorAll('.intel-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeIntelTab = tab.dataset.tab;
+      document.querySelectorAll('.intel-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      if (intelState && intelState.verdict) renderIntel(intelState);
+      else showIntelTabPanes();
+    });
+  });
+
+  function showIntelTabPanes() {
+    intelPanel.querySelectorAll('[data-pane]').forEach(p => {
+      p.style.display = p.dataset.pane === activeIntelTab ? '' : 'none';
+    });
+  }
+
+  function mergeIntel(partial) {
+    intelState = { ...intelState, ...partial, contract_name: partial.contract_name || intelState.contract_name || selectedTarget };
+    renderIntel(intelState);
+  }
+
+  document.querySelectorAll('.target-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedTarget = btn.dataset.target;
+      document.querySelectorAll('.target-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('active-target').textContent = selectedTarget;
+      loadSavedIntel(selectedTarget);
+    });
+  });
+
+  function appendLine(cls, text) {
+    const div = document.createElement('div');
+    div.className = 'line ' + cls;
+    div.textContent = text;
+    terminal.insertBefore(div, terminal.lastElementChild);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  function clearTerminal() {
+    terminal.innerHTML = '';
+    appendLine('dim', 'Starting new session…');
+  }
+
+  function renderIntel(data) {
+    intelEmpty.style.display = 'none';
+    intelPanel.style.display = 'block';
+
+    let story = '';
+    if (data.verdict) {
+      story += `<div class="verdict-card ${data.verdict_status}">
+        <h2>${data.verdict_icon} ${data.verdict_label}</h2>
+        <p>${escapeHtml(data.verdict_sub || '')} · ${data.drain_eth || '0'} ETH drained · ${data.total_s || '?'}s</p>
+      </div>`;
+    }
+    const ls = data.lifecycle_story || {};
+    const beats = [
+      ['Finding', ls.finding],
+      ['Proof', ls.proof],
+      ['Fix', ls.fix],
+      ['Verification', ls.verification],
+    ];
+    beats.forEach(([title, text]) => {
+      if (text) {
+        story += `<div class="story-beat"><h4>${title}</h4><p>${escapeHtml(String(text))}</p></div>`;
+      }
+    });
+    if (!ls.finding && !ls.proof && data.verdict_sub) {
+      story += `<div class="story-beat"><h4>Summary</h4><p>${escapeHtml(data.verdict_sub)}</p></div>`;
+    }
+
+    let solution = '';
+    if (data.patch || data.patch_diff || data.patch_status) {
+      const verified = data.patch_verified;
+      const status = data.patch_status || 'unknown';
+      solution += `<div class="intel-section"><h3>Patch &amp; verify</h3>`;
+      solution += `<span class="patch-pill ${verified ? 'ok' : 'fail'}">${verified ? 'patch blocks exploit' : status}</span>`;
+      if (status === 'skipped') {
+        solution += `<div class="derivation" style="margin-top:.5rem">Patch verify was skipped. Set ENABLE_PATCH_VERIFY=true in .env and re-run.</div>`;
+      }
+      if (data.patch_reasoning) {
+        solution += `<div class="derivation" style="margin-top:.5rem">${escapeHtml(String(data.patch_reasoning).slice(0,500))}</div>`;
+      }
+      const diff = data.patch_diff || (data.patch && data.patch.diff) || '';
+      if (diff) {
+        solution += `<pre class="patch-diff">${escapeHtml(diff.slice(0,2500))}</pre>`;
+      }
+      const cn = data.contract_name || selectedTarget;
+      if (diff && cn) {
+        solution += `<a class="btn-link" href="/api/patch/${cn}" download>Download patch diff</a>`;
+      }
+      solution += `</div>`;
+    } else {
+      solution += `<div class="empty-intel" style="padding:1rem 0">Run with patch verify enabled to see generated fixes here.</div>`;
+    }
+
+    let exploit = '';
+    if (data.generated_exploit_source && !data.generated_exploit_source.startsWith('FALLBACK')) {
+      exploit += `<div class="intel-section"><h3>Generated exploit.sol</h3><pre class="exploit">${escapeHtml(data.generated_exploit_source.slice(0, 1500))}</pre></div>`;
+    }
+    if (data.attempt_history && data.attempt_history.length) {
+      exploit += `<div class="intel-section"><h3>Attempt timeline</h3><div class="attempt-timeline">`;
+      data.attempt_history.forEach(a => {
+        const ok = a.result && a.result.success;
+        exploit += `<div class="attempt-row ${ok ? 'ok' : 'fail'}">#${(a.attempt||0)+1} · ${ok ? 'drained' : escapeHtml((a.result?.revert_reason || 'failed').slice(0,80))}</div>`;
+      });
+      exploit += `</div></div>`;
+    }
+    if (data.has_foundry_poc && data.contract_name) {
+      exploit += `<a class="btn-link" href="/api/foundry/${data.contract_name}" download>Download Foundry PoC (.t.sol)</a>`;
+    }
+    if (!exploit) exploit = `<div class="empty-intel" style="padding:1rem 0">Exploit source appears after a successful run.</div>`;
+
+    let research = '';
+    if (data.risk_primary && data.risk_primary.reasoning) {
+      research += `<div class="intel-section"><h3>Recon · Nemotron Nano</h3>
+        <div class="risk-box"><strong>${escapeHtml(data.risk_primary.risk_pattern || '')}</strong> (${Math.round((data.risk_primary.confidence||0)*100)}%)<br><br>${escapeHtml(data.risk_primary.reasoning)}</div></div>`;
+    }
+    const sources = data.precedent_sources || data.sources || [];
+    if (sources.length) {
+      const pattern = (data.risk_primary && data.risk_primary.risk_pattern) || 'vulnerability';
+      research += `<div class="intel-section"><h3>Tavily · Exploit precedent</h3>
+        <div class="derivation">Historical writeups that shaped the ${escapeHtml(pattern)} strategy.</div>`;
+      sources.forEach((s, i) => {
+        const url = s.url || '#';
+        research += `<div class="source-card">
+          <div class="title">${s.url ? `<a href="${url}" target="_blank" rel="noopener">${escapeHtml(s.title || 'Source')}</a>` : escapeHtml(s.title || 'Source')}</div>
+          <div class="snippet">${escapeHtml((s.content || '').slice(0, 320))}${(s.content||'').length > 320 ? '…' : ''}</div>
+          <span class="tag">precedent #${i+1}</span>
+        </div>`;
+      });
+      research += '</div>';
+    }
+    if (data.reasoning) {
+      research += `<div class="intel-section"><h3>Ultra · Attack reasoning</h3><div class="derivation">${escapeHtml(data.reasoning)}</div></div>`;
+    }
+    if (!research) research = `<div class="empty-intel" style="padding:1rem 0">Recon and Tavily cards appear during the run.</div>`;
+
+    let decision = '<div class="intel-section"><h3>Agent decision log</h3>';
+    if (data.risk_primary && data.risk_primary.risk_pattern) {
+      decision += `<div class="story-beat"><h4>1 · Recon (Nano)</h4><p>${escapeHtml(data.risk_primary.risk_pattern)} on ${escapeHtml(data.risk_primary.function_name || '?')} — ${escapeHtml((data.risk_primary.reasoning || '').slice(0, 280))}</p></div>`;
+    }
+    const srcs = data.precedent_sources || [];
+    if (srcs.length) {
+      decision += `<div class="story-beat"><h4>2 · Precedent (Tavily)</h4><p>${srcs.length} source(s): ${escapeHtml((srcs[0].title || '').slice(0, 120))}${srcs.length > 1 ? '…' : ''}</p></div>`;
+    }
+    if (data.reasoning) {
+      decision += `<div class="story-beat"><h4>3 · Propose (Ultra)</h4><p>${escapeHtml(String(data.reasoning).slice(0, 400))}</p></div>`;
+    }
+    if (data.attempt_history && data.attempt_history.length) {
+      decision += `<div class="story-beat"><h4>4 · Execute / retry</h4><p>`;
+      data.attempt_history.forEach(a => {
+        const ok = a.result && a.result.success;
+        const fb = a.used_fallback_this_attempt;
+        decision += `#${(a.attempt || 0) + 1}${fb ? ' (safety-net)' : ''}: ${ok ? 'drained' : escapeHtml(String(a.result?.revert_reason || 'failed').slice(0, 60))} · `;
+      });
+      decision += `</p></div>`;
+    }
+    if (data.patch_status) {
+      const oz = (data.patch && data.patch.oz_pattern) || '';
+      decision += `<div class="story-beat"><h4>5 · Patch &amp; verify</h4><p>${escapeHtml(data.patch_status)}${data.patch_verified ? ' · exploit blocked' : ''}${oz ? ' · OZ-equivalent: ' + escapeHtml(oz) : ''}</p></div>`;
+    }
+    if (decision.indexOf('story-beat') < 0) {
+      decision += `<div class="empty-intel" style="padding:1rem 0">Decision steps appear as the pipeline runs.</div>`;
+    }
+    decision += '</div>';
+
+    const panes = [
+      ['story', story],
+      ['decision', decision],
+      ['solution', solution],
+      ['exploit', exploit],
+      ['research', research],
+    ];
+    intelPanel.innerHTML = panes.map(([id, html]) =>
+      `<div class="intel-tab-pane" data-pane="${id}" style="${id === activeIntelTab ? '' : 'display:none'}">${html}</div>`
+    ).join('');
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function loadSavedIntel(target) {
+    let saved = SAVED.find(s => s.contract_name === target);
+    const hoRow = HELD_OUT && HELD_OUT[target];
+    if (hoRow && hoRow.patch_verified && (!saved || !saved.patch_verified)) {
+      saved = reportToIntel(hoRow, target);
+    }
+    if (saved) {
+      intelState = { ...saved, contract_name: target };
+      renderIntel(intelState);
+    } else {
+      intelPanel.style.display = 'none';
+      intelEmpty.style.display = 'block';
+    }
+  }
+
+  function handleEvent(ev) {
+    switch (ev.type) {
+      case 'log':
+        appendLine(ev.level || 'info', ev.message);
+        break;
+      case 'pipeline_start':
+        appendLine('cmd', `re-entry run --target ${ev.target}`);
+        break;
+      case 'preflight_start':
+        appendLine('info', 'preflight · checking target balance…');
+        break;
+      case 'preflight_redeploy':
+        appendLine('warn', 'preflight · redeploying unfunded contracts…');
+        break;
+      case 'preflight_done':
+        appendLine('success', `preflight · ${((ev.balance_wei||0)/1e18).toFixed(1)} ETH on target`);
+        break;
+      case 'preflight_failed':
+        appendLine('error', `preflight · ${ev.message}`);
+        break;
+      case 'compile_failed':
+        appendLine('warn', `  compile · ${(ev.error||'').slice(0,80)}`);
+        break;
+      case 'recon_start':
+        appendLine('info', 'recon · scanning ABI + source with Nemotron Nano…');
+        break;
+      case 'recon_done':
+        appendLine('success', `recon · ${(ev.risk_flags||[]).length} risk flag(s) · ${(ev.timing?.duration_s||0).toFixed(1)}s`);
+        if (ev.risk_flags && ev.risk_flags[0]) {
+          appendLine('dim', `  → ${ev.risk_flags[0].risk_pattern}: ${ev.risk_flags[0].function_name}`);
+          mergeIntel({ risk_primary: ev.risk_flags[0] });
+        }
+        break;
+      case 'precedent_start':
+        appendLine('info', `tavily · searching precedent for "${ev.pattern}"…`);
+        break;
+      case 'precedent_done':
+        appendLine('success', `tavily · ${(ev.sources||[]).length} source(s) found`);
+        (ev.sources||[]).forEach((s, i) => {
+          appendLine('dim', `  [${i+1}] ${s.title || 'untitled'}${s.url ? ' → ' + s.url : ''}`);
+        });
+        mergeIntel({ precedent_sources: ev.sources || [] });
+        break;
+      case 'attempt_start':
+        appendLine('section', `attempt ${ev.attempt}`);
+        break;
+      case 'propose_start':
+        appendLine('info', '  ultra · generating Solidity exploit…');
+        break;
+      case 'propose_done':
+        appendLine('success', `  ultra · contract ready · ${(ev.timing?.llm_calls?.[0]?.duration_s||0).toFixed(1)}s`);
+        if (ev.reasoning) appendLine('dim', `  reasoning: ${ev.reasoning}`);
+        mergeIntel({ reasoning: ev.reasoning });
+        break;
+      case 'execute_start':
+        appendLine('info', '  sandbox · compile, deploy, execute…');
+        break;
+      case 'attempt_done':
+        if (ev.success) {
+          appendLine('success', '  ✓ execute · vault drained');
+        } else {
+          appendLine('error', `  ✗ execute · ${(ev.revert_reason||'failed').slice(0,100)}`);
+        }
+        break;
+      case 'retry_research_done':
+        appendLine('info', `  tavily · retry research (${(ev.sources||[]).length} hits)`);
+        break;
+      case 'fallback_start':
+        appendLine('warn', '  safety-net · ABI heuristic fallback (labeled; not agent-generated)');
+        break;
+      case 'patch_start':
+        appendLine('info', 'patch · generating minimal fix with Ultra…');
+        break;
+      case 'patch_propose_done':
+        appendLine('success', `  patch · compiled (${ev.contract_name || 'patched'})`);
+        break;
+      case 'patch_verify_done':
+        appendLine(ev.verified ? 'success' : 'error',
+          ev.verified ? '  verify · exploit blocked on patched deploy' : '  verify · exploit still works on patch');
+        break;
+      case 'patch_failed':
+        appendLine('error', `  patch · ${(ev.message||'failed').slice(0,80)}`);
+        break;
+      case 'patch_done':
+        appendLine(ev.verified ? 'success' : 'warn', `patch · ${ev.status || 'done'}`);
+        break;
+      case 'pipeline_done':
+        if (ev.report) {
+          const r = ev.report;
+          appendLine(r.verdict?.includes('vulnerable') ? 'success' : 'warn',
+            `verdict · ${r.verdict} · ${((r.drain_amount_wei||0)/1e18).toFixed(2)} ETH`);
+          if (r.patch_status) {
+            appendLine(r.patch_verified ? 'success' : 'warn',
+              `solution · patch ${r.patch_status}${r.patch_verified ? ' (exploit blocked)' : ''}`);
+          }
+          intelState = reportToIntel(r, selectedTarget);
+          renderIntel(intelState);
+        }
+        break;
+      case 'suite_start':
+        appendLine('section', `suite · tier ${ev.tier} · ${(ev.targets||[]).join(', ')}`);
+        break;
+      case 'suite_target':
+        selectedTarget = ev.target;
+        document.querySelectorAll('.target-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.target === ev.target);
+        });
+        document.getElementById('active-target').textContent = ev.target;
+        appendLine('section', `── ${ev.target} ──`);
+        intelState = { contract_name: ev.target };
+        break;
+      case 'suite_target_done':
+        appendLine('dim', `  done · ${ev.target} · ${ev.verdict || '?'}`);
+        break;
+      case 'suite_done':
+        appendLine('success', `suite · ${ev.tier} complete`);
+        loadSavedIntel(selectedTarget);
+        break;
+      case 'error':
+        appendLine('error', ev.message);
+        break;
+    }
+  }
+
+  function connectRunStream(runId, onDone) {
+    const es = new EventSource(`/api/runs/${runId}/stream`);
+    es.onmessage = (msg) => {
+      const ev = JSON.parse(msg.data);
+      if (ev.type === '__done__') {
+        es.close();
+        running = false;
+        if (onDone) onDone(ev);
+        return;
+      }
+      handleEvent(ev);
+    };
+    es.onerror = () => {
+      es.close();
+      running = false;
+      appendLine('error', 'stream disconnected');
+    };
+    return es;
+  }
+
+  document.getElementById('btn-deploy').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-deploy');
+    btn.disabled = true;
+    appendLine('info', 'deploy · funding demo contracts on Anvil…');
+    try {
+      const res = await fetch('/api/deploy', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'deploy failed');
+      appendLine('success', `deploy · ${data.contracts.join(', ')}`);
+    } catch (e) {
+      appendLine('error', e.message);
+    }
+    btn.disabled = false;
+  });
+
+  document.getElementById('btn-run').addEventListener('click', async () => {
+    if (running) return;
+    running = true;
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    clearTerminal();
+    intelState = { contract_name: selectedTarget };
+    try {
+      const res = await fetch('/api/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: selectedTarget }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'run failed');
+
+      connectRunStream(data.run_id, (ev) => {
+        btn.disabled = false;
+        if (ev.error) appendLine('error', ev.error);
+        if (ev.report) {
+          intelState = reportToIntel(ev.report, selectedTarget);
+          renderIntel(intelState);
+          const idx = SAVED.findIndex(s => s.contract_name === selectedTarget);
+          const row = reportToIntel(ev.report, selectedTarget);
+          if (idx >= 0) SAVED[idx] = row;
+          else SAVED.push(row);
+        }
+      });
+    } catch (e) {
+      appendLine('error', e.message);
+      running = false;
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btn-run-suite').addEventListener('click', async () => {
+    if (running) return;
+    running = true;
+    const btn = document.getElementById('btn-run-suite');
+    const runBtn = document.getElementById('btn-run');
+    btn.disabled = true;
+    runBtn.disabled = true;
+    clearTerminal();
+    appendLine('cmd', 're-entry run-suite --tier held_out_sealed');
+    try {
+      const res = await fetch('/api/run-suite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: 'held_out_sealed' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'suite failed');
+      connectRunStream(data.run_id, (ev) => {
+        btn.disabled = false;
+        runBtn.disabled = false;
+        if (ev.error) appendLine('error', ev.error);
+        loadSavedIntel(selectedTarget);
+      });
+    } catch (e) {
+      appendLine('error', e.message);
+      running = false;
+      btn.disabled = false;
+      runBtn.disabled = false;
+    }
+  });
+
+  if (SAVED.length) loadSavedIntel(selectedTarget);
+
+  // Refresh anvil status
+  fetch('/api/status').then(r => r.json()).then(s => {
+    const anvilPill = document.getElementById('pill-anvil');
+    anvilPill.className = 'pill ' + (s.anvil.connected ? 'ok' : 'bad');
+    anvilPill.textContent = 'anvil ' + (s.anvil.connected ? '●' : '○');
+    const contreePill = document.getElementById('pill-contree');
+    if (contreePill && s.contree) {
+      contreePill.className = 'pill ' + (s.contree.connected ? 'ok' : 'bad');
+      contreePill.textContent = 'sandboxes ' + (s.contree.connected ? '●' : '○');
+    }
+    const modePill = document.getElementById('pill-mode');
+    if (modePill) modePill.textContent = s.sandbox_mode || 'local';
+  });
+</script>
 </body>
 </html>

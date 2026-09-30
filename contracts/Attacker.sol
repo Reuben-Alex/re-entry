@@ -20,7 +20,7 @@ interface IVault {
 ///   inject itself into the middle of an in-flight blockchain
 ///   transaction. Only another SMART CONTRACT's receive() function can
 ///   do that, because the EVM itself invokes it as part of the transfer.
-///   This is the one piece of PoCForge that genuinely must be Solidity —
+///   This is the one piece of Re-entry that genuinely must be Solidity —
 ///   everything else (deploying it, triggering it, reading balances) is
 ///   driven from Python via web3.py.
 contract Attacker {

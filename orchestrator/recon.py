@@ -80,6 +80,54 @@ def _heuristic_risk_flags(source_code: str) -> list[dict]:
                     ),
                 }
             )
+    if re.search(r"function\s+changeOwner\s*\(", source_code):
+        if "onlyOwner" not in source_code:
+            # changeOwner body may lack require — treat as ACL risk
+            flags.append(
+                {
+                    "function_name": "changeOwner",
+                    "risk_pattern": "access_control",
+                    "confidence": 0.7,
+                    "reasoning": (
+                        "Heuristic: changeOwner may lack onlyOwner "
+                        "(OWASP SC01); seize ownership then drain"
+                    ),
+                }
+            )
+    if re.search(r"function\s+flashFee\s*\(", source_code):
+        flags.append(
+            {
+                "function_name": "flashFee",
+                "risk_pattern": "logic",
+                "confidence": 0.7,
+                "reasoning": (
+                    "Heuristic: permissionless flashFee may drain vault ETH"
+                ),
+            }
+        )
+    if re.search(r"function\s+setPrice\s*\(", source_code):
+        if "onlyOwner" not in source_code and "msg.sender == owner" not in source_code:
+            flags.append(
+                {
+                    "function_name": "setPrice",
+                    "risk_pattern": "oracle_manipulation",
+                    "confidence": 0.7,
+                    "reasoning": (
+                        "Heuristic: setPrice without access control (oracle manipulation)"
+                    ),
+                }
+            )
+    if re.search(r"function\s+release\s*\(\s*address", source_code):
+        flags.append(
+            {
+                "function_name": "release",
+                "risk_pattern": "logic|escrow",
+                "confidence": 0.65,
+                "reasoning": (
+                    "Heuristic: release(address) may pay msg.sender from another user's balance"
+                ),
+            }
+        )
     return flags
 
 

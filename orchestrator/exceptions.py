@@ -1,4 +1,4 @@
-"""Custom exceptions for the PoCForge orchestrator."""
+"""Custom exceptions for the Re-entry orchestrator."""
 
 
 class ConfigurationError(Exception):
