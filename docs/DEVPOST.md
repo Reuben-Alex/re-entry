@@ -45,8 +45,8 @@ Static analyzers guess. Audits pattern-match. **Re-entry proves** a smart-contra
 Nebius Token Factory · NVIDIA Nemotron 3 · Tavily · Foundry/Anvil · web3.py · FastAPI · (optional) Nebius Sandboxes / Contree
 
 ## Links
-- Public repo (MIT)
-- Demo URL (dashboard)
-- YouTube ≤3 min (audio names Token Factory + Nemotron at each step)
+- Public repo (MIT): https://github.com/Reuben-Alex-66/re-entry
+- Demo URL: run `deploy/Dockerfile` on a Nebius VM (see [deploy/README.md](../deploy/README.md)); local dashboard is http://127.0.0.1:8000
+- YouTube ≤3 min: record from [docs/DEMO_SCRIPT.md](DEMO_SCRIPT.md); audio names Token Factory + Nemotron at each step
 - Best Use of Tavily writeup: [docs/TAVILY.md](TAVILY.md)
 - Token Factory feedback: [docs/FEEDBACK.md](FEEDBACK.md)
