@@ -23,8 +23,8 @@ from orchestrator import challenges, config
 from orchestrator.loop import run_pipeline
 from orchestrator.sandbox import create_sandbox
 
-DEFAULT_RUNS = 10
-BENCHMARK_TIERS = ("train", "held_out_sealed")
+DEFAULT_RUNS = 3
+BENCHMARK_TIERS = ("train", "held_out_sealed", "benchmark", "control")
 
 
 def _benchmark_targets() -> list[str]:
@@ -120,48 +120,73 @@ def _run_benchmark(target: str, runs: int, deployed: dict) -> dict:
     }
 
 
+def _headline(summaries: dict) -> dict:
+    non_control = {
+        name: row
+        for name, row in summaries.items()
+        if not name.startswith("Safe")
+    }
+    agent_n = sum(row["agent_success"] for row in non_control.values())
+    fallback_n = sum(row["fallback_success"] for row in non_control.values())
+    fail_n = sum(row["total_fail"] for row in non_control.values())
+    total_n = sum(row["total_runs"] for row in non_control.values())
+    return {
+        "agent_success": agent_n,
+        "fallback_success": fallback_n,
+        "no_exploit_or_fail": fail_n,
+        "non_control_runs": total_n,
+        "headline": (
+            f"Agent-generated {agent_n}/{total_n} on non-control runs; "
+            f"fallback {fallback_n}; other {fail_n}. "
+            f"Controls are scored separately and are not in the agent rate."
+        ),
+    }
+
+
 def main():
     runs = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_RUNS
+    only = sys.argv[2:]
 
     results_dir = Path(config.RESULTS_DIR)
     results_dir.mkdir(parents=True, exist_ok=True)
+    out_path = results_dir / "benchmark.json"
 
     print("Deploying demo contracts for benchmark…")
     deployed = _deploy_all()
 
     targets = _benchmark_targets()
+    if only:
+        unknown = [name for name in only if name not in targets]
+        if unknown:
+            raise SystemExit(f"Unknown target(s): {', '.join(unknown)}")
+        targets = [name for name in targets if name in only]
     summaries = {}
     for target in targets:
         print(f"\nBenchmarking {target} ({runs} runs)…")
         summaries[target] = _run_benchmark(target, runs, deployed)
 
-    vault_key = "VulnerableVault"
-    vault = summaries.get(vault_key, {})
-    agent_n = vault.get("agent_success", 0)
-    out = {
-        "runs_per_target": runs,
-        "tiers": list(BENCHMARK_TIERS),
-        "targets": summaries,
-        "headline": (
-            f"Ultra succeeds without fallback in {agent_n}/{runs} "
-            f"{vault_key} runs"
-        ),
-    }
+    if only and out_path.exists():
+        out = json.loads(out_path.read_text())
+        out.setdefault("targets", {}).update(summaries)
+        summaries = out["targets"]
+    else:
+        out = {
+            "runs_per_target": runs,
+            "tiers": list(BENCHMARK_TIERS),
+            "targets": summaries,
+        }
 
-    out_path = results_dir / "benchmark.json"
+    out.update(_headline(summaries))
     out_path.write_text(json.dumps(out, indent=2))
 
     print("\n" + "=" * 50)
     print(out["headline"])
     for name, row in summaries.items():
-        if name == vault_key:
-            continue
         print(
             f"{name}: {row['agent_success']}/{runs} agent, "
-            f"{row['fallback_success']}/{runs} fallback"
+            f"{row['fallback_success']}/{runs} fallback, "
+            f"{row['total_fail']}/{runs} other"
         )
-    if vault:
-        print(f"Avg time ({vault_key}): {vault['avg_time_all_s']:.1f}s")
     print(f"\nWrote {out_path}")
 
 

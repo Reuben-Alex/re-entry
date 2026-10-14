@@ -1,0 +1,562 @@
+{
+  "runs_per_target": 1,
+  "tiers": [
+    "train",
+    "held_out_sealed",
+    "benchmark",
+    "control"
+  ],
+  "targets": {
+    "VulnerableVault": {
+      "target": "VulnerableVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 1,
+      "total_fail": 0,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 1.0,
+      "avg_time_all_s": 122.72736597061157,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 122.72736597061157,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "vulnerable_fallback",
+          "used_fallback": true,
+          "total_time_s": 122.72736597061157,
+          "attempts": 4
+        }
+      ]
+    },
+    "VulnerableOracleVault": {
+      "target": "VulnerableOracleVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 130.5375099182129,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 130.5375099182129,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 130.5375099182129,
+          "attempts": 4
+        }
+      ]
+    },
+    "VulnerableTreasury": {
+      "target": "VulnerableTreasury",
+      "total_runs": 1,
+      "agent_success": 1,
+      "fallback_success": 0,
+      "total_fail": 0,
+      "agent_success_rate": 1.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 24.894981861114502,
+      "avg_time_agent_success_s": 24.894981861114502,
+      "max_time_s": 24.894981861114502,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "vulnerable_agent_generated",
+          "used_fallback": false,
+          "total_time_s": 24.894981861114502,
+          "attempts": 1
+        }
+      ]
+    },
+    "VulnerableEscrow": {
+      "target": "VulnerableEscrow",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 1,
+      "total_fail": 0,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 1.0,
+      "avg_time_all_s": 210.0096890926361,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 210.0096890926361,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "vulnerable_fallback",
+          "used_fallback": true,
+          "total_time_s": 210.0096890926361,
+          "attempts": 4
+        }
+      ]
+    },
+    "VulnerableBlind": {
+      "target": "VulnerableBlind",
+      "total_runs": 1,
+      "agent_success": 1,
+      "fallback_success": 0,
+      "total_fail": 0,
+      "agent_success_rate": 1.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 64.09917688369751,
+      "avg_time_agent_success_s": 64.09917688369751,
+      "max_time_s": 64.09917688369751,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "vulnerable_agent_generated",
+          "used_fallback": false,
+          "total_time_s": 64.09917688369751,
+          "attempts": 2
+        }
+      ]
+    },
+    "CrossFunctionVault": {
+      "target": "CrossFunctionVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 86.34228372573853,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 86.34228372573853,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 86.34228372573853,
+          "attempts": 4
+        }
+      ]
+    },
+    "HookVault": {
+      "target": "HookVault",
+      "total_runs": 1,
+      "agent_success": 1,
+      "fallback_success": 0,
+      "total_fail": 0,
+      "agent_success_rate": 1.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 210.04345679283142,
+      "avg_time_agent_success_s": 210.04345679283142,
+      "max_time_s": 210.04345679283142,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "vulnerable_agent_generated",
+          "used_fallback": false,
+          "total_time_s": 210.04345679283142,
+          "attempts": 3
+        }
+      ]
+    },
+    "InflatingVault": {
+      "target": "InflatingVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 207.7981309890747,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 207.7981309890747,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 207.7981309890747,
+          "attempts": 4
+        }
+      ]
+    },
+    "OpenProxy": {
+      "target": "OpenProxy",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 107.5585949420929,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 107.5585949420929,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 107.5585949420929,
+          "attempts": 4
+        }
+      ]
+    },
+    "ReplayVault": {
+      "target": "ReplayVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 56.154175996780396,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 56.154175996780396,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 56.154175996780396,
+          "attempts": 4
+        }
+      ]
+    },
+    "SpotLending": {
+      "target": "SpotLending",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 78.71603631973267,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 78.71603631973267,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 78.71603631973267,
+          "attempts": 4
+        }
+      ]
+    },
+    "FallbackBank": {
+      "target": "FallbackBank",
+      "total_runs": 1,
+      "agent_success": 1,
+      "fallback_success": 0,
+      "total_fail": 0,
+      "agent_success_rate": 1.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 39.43893003463745,
+      "avg_time_agent_success_s": 39.43893003463745,
+      "max_time_s": 39.43893003463745,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "vulnerable_agent_generated",
+          "used_fallback": false,
+          "total_time_s": 39.43893003463745,
+          "attempts": 1
+        }
+      ]
+    },
+    "NaiveFeeVault": {
+      "target": "NaiveFeeVault",
+      "total_runs": 1,
+      "agent_success": 1,
+      "fallback_success": 0,
+      "total_fail": 0,
+      "agent_success_rate": 1.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 22.45634627342224,
+      "avg_time_agent_success_s": 22.45634627342224,
+      "max_time_s": 22.45634627342224,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "vulnerable_agent_generated",
+          "used_fallback": false,
+          "total_time_s": 22.45634627342224,
+          "attempts": 1
+        }
+      ]
+    },
+    "SafeVault": {
+      "target": "SafeVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 59.37244486808777,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 59.37244486808777,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 59.37244486808777,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeTreasury": {
+      "target": "SafeTreasury",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 142.158447265625,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 142.158447265625,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 142.158447265625,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeEscrow": {
+      "target": "SafeEscrow",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 178.36694717407227,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 178.36694717407227,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 178.36694717407227,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeBlind": {
+      "target": "SafeBlind",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 233.62339401245117,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 233.62339401245117,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 233.62339401245117,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeFallbackBank": {
+      "target": "SafeFallbackBank",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 158.59014892578125,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 158.59014892578125,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 158.59014892578125,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeNaiveFeeVault": {
+      "target": "SafeNaiveFeeVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 146.79796290397644,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 146.79796290397644,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 146.79796290397644,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeOracleVault": {
+      "target": "SafeOracleVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 256.9134120941162,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 256.9134120941162,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 256.9134120941162,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeCrossFunctionVault": {
+      "target": "SafeCrossFunctionVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 349.905965089798,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 349.905965089798,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 349.905965089798,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeHookVault": {
+      "target": "SafeHookVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 174.61631798744202,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 174.61631798744202,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 174.61631798744202,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeInflatingVault": {
+      "target": "SafeInflatingVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 431.1682622432709,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 431.1682622432709,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 431.1682622432709,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeProxy": {
+      "target": "SafeProxy",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 116.98074698448181,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 116.98074698448181,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 116.98074698448181,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeReplayVault": {
+      "target": "SafeReplayVault",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 190.70315504074097,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 190.70315504074097,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 190.70315504074097,
+          "attempts": 4
+        }
+      ]
+    },
+    "SafeLendingPool": {
+      "target": "SafeLendingPool",
+      "total_runs": 1,
+      "agent_success": 0,
+      "fallback_success": 0,
+      "total_fail": 1,
+      "agent_success_rate": 0.0,
+      "fallback_rate": 0.0,
+      "avg_time_all_s": 153.38389492034912,
+      "avg_time_agent_success_s": 0,
+      "max_time_s": 153.38389492034912,
+      "per_run": [
+        {
+          "run": 1,
+          "verdict": "no_exploit_found",
+          "used_fallback": false,
+          "total_time_s": 153.38389492034912,
+          "attempts": 4
+        }
+      ]
+    }
+  },
+  "agent_success": 5,
+  "fallback_success": 2,
+  "no_exploit_or_fail": 6,
+  "non_control_runs": 13,
+  "headline": "Agent-generated 5/13 on non-control runs; fallback 2; other 6. Controls are scored separately and are not in the agent rate."
+}

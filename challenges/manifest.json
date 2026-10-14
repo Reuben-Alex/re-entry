@@ -110,6 +110,239 @@
       "vuln_class": "oracle_manipulation",
       "owasp": "SC02",
       "source": "contracts/SafeOracleVault.sol"
+    },
+    {
+      "name": "CrossFunctionVault",
+      "tier": "held_out_sealed",
+      "vuln_class": "reentrancy",
+      "owasp": "SC05",
+      "source": "challenges/sealed/CrossFunctionVault.sol",
+      "control": "SafeCrossFunctionVault"
+    },
+    {
+      "name": "SafeCrossFunctionVault",
+      "tier": "control",
+      "vuln_class": "reentrancy",
+      "owasp": "SC05",
+      "source": "contracts/SafeCrossFunctionVault.sol"
+    },
+    {
+      "name": "HookVault",
+      "tier": "held_out_sealed",
+      "vuln_class": "reentrancy",
+      "owasp": "SC05",
+      "source": "challenges/sealed/HookVault.sol",
+      "contract_name": "HookVault",
+      "control": "SafeHookVault",
+      "setup": {
+        "companions": [{"contract_name": "NotifyToken"}],
+        "constructor_args": ["NotifyToken"]
+      }
+    },
+    {
+      "name": "SafeHookVault",
+      "tier": "control",
+      "vuln_class": "reentrancy",
+      "owasp": "SC05",
+      "source": "contracts/SafeHookVault.sol",
+      "setup": {
+        "companions": [{"contract_name": "NotifyToken"}],
+        "constructor_args": ["NotifyToken"]
+      }
+    },
+    {
+      "name": "InflatingVault",
+      "tier": "held_out_sealed",
+      "vuln_class": "share_inflation",
+      "owasp": "SC08",
+      "source": "challenges/sealed/InflatingVault.sol",
+      "control": "SafeInflatingVault",
+      "setup": {
+        "fund": null,
+        "preflight_min_wei": 0,
+        "schedule_note": "After attack() returns, the sandbox calls deposit() on the target from a separate account with 5 ether, then calls withdraw() on your exploit contract.",
+        "after_attack": [
+          {"fn": "deposit", "value_wei": "5000000000000000000", "from_account": 1, "on": "target"},
+          {"fn": "withdraw", "from_account": 5, "on": "exploit"}
+        ],
+        "benign": [
+          {"fn": "deposit", "value_wei": "1000000000000000000", "from_account": 1},
+          {"fn": "withdraw", "from_account": 1}
+        ]
+      }
+    },
+    {
+      "name": "SafeInflatingVault",
+      "tier": "control",
+      "vuln_class": "share_inflation",
+      "owasp": "SC08",
+      "source": "contracts/SafeInflatingVault.sol",
+      "setup": {
+        "fund": null,
+        "preflight_min_wei": 0,
+        "benign": [
+          {"fn": "deposit", "value_wei": "1000000000000000000", "from_account": 1},
+          {"fn": "withdraw", "from_account": 1}
+        ]
+      }
+    },
+    {
+      "name": "OpenProxy",
+      "tier": "held_out_sealed",
+      "vuln_class": "access_control",
+      "owasp": "SC01",
+      "source": "challenges/sealed/OpenProxy.sol",
+      "contract_name": "Proxy",
+      "control": "SafeProxy",
+      "setup": {
+        "companions": [{"contract_name": "Logic"}],
+        "constructor_args": ["Logic"],
+        "abi_contract": "Logic",
+        "benign": [
+          {"fn": "initialize", "from_account": 0},
+          {"fn": "deposit", "value_wei": "1000000000000000000", "from_account": 1},
+          {"fn": "withdrawAll", "from_account": 0}
+        ]
+      }
+    },
+    {
+      "name": "SafeProxy",
+      "tier": "control",
+      "vuln_class": "access_control",
+      "owasp": "SC01",
+      "source": "contracts/SafeProxy.sol",
+      "setup": {
+        "companions": [{"contract_name": "Logic"}],
+        "constructor_args": ["Logic"],
+        "abi_contract": "Logic",
+        "after_deploy": [
+          {"fn": "initialize", "from_account": 0, "on": "target"}
+        ],
+        "benign": [
+          {"fn": "deposit", "value_wei": "1000000000000000000", "from_account": 1},
+          {"fn": "withdrawAll", "from_account": 0}
+        ]
+      }
+    },
+    {
+      "name": "ReplayVault",
+      "tier": "held_out_sealed",
+      "vuln_class": "signature_replay",
+      "owasp": "SC03",
+      "source": "challenges/sealed/ReplayVault.sol",
+      "control": "SafeReplayVault",
+      "setup": {
+        "constructor_args": ["__ephemeral_signer__"],
+        "observation": "replay_signature",
+        "observation_amount_wei": "1000000000000000000"
+      }
+    },
+    {
+      "name": "SafeReplayVault",
+      "tier": "control",
+      "vuln_class": "signature_replay",
+      "owasp": "SC03",
+      "source": "contracts/SafeReplayVault.sol",
+      "setup": {
+        "constructor_args": ["__ephemeral_signer__"]
+      }
+    },
+    {
+      "name": "SpotLending",
+      "tier": "held_out_sealed",
+      "vuln_class": "oracle_manipulation",
+      "owasp": "SC02",
+      "source": "challenges/sealed/SpotLending.sol",
+      "contract_name": "LendingPool",
+      "control": "SafeLendingPool",
+      "setup": {
+        "fund": null,
+        "preflight_min_wei": "1000000000000000000",
+        "companions": [
+          {"contract_name": "CollateralToken"},
+          {"contract_name": "MiniAMM", "args": ["CollateralToken"]},
+          {"contract_name": "FlashLender"}
+        ],
+        "constructor_args": ["MiniAMM", "CollateralToken", "FlashLender"],
+        "tokens": ["CollateralToken"],
+        "after_deploy": [
+          {
+            "fn": "approve",
+            "args": ["MiniAMM", "10000000000000000000"],
+            "on": "CollateralToken",
+            "from_account": 0
+          },
+          {
+            "fn": "seed",
+            "args": ["10000000000000000000"],
+            "value_wei": "10000000000000000000",
+            "on": "MiniAMM",
+            "from_account": 0
+          },
+          {
+            "fn": "fund",
+            "value_wei": "40000000000000000000",
+            "on": "FlashLender",
+            "from_account": 0
+          },
+          {
+            "fn": "deposit",
+            "value_wei": "20000000000000000000",
+            "on": "target",
+            "from_account": 0
+          }
+        ],
+        "benign": [
+          {"fn": "deposit", "value_wei": "1000000000000000000", "from_account": 1}
+        ]
+      }
+    },
+    {
+      "name": "SafeLendingPool",
+      "tier": "control",
+      "vuln_class": "oracle_manipulation",
+      "owasp": "SC02",
+      "source": "contracts/SafeLendingPool.sol",
+      "setup": {
+        "fund": null,
+        "preflight_min_wei": "1000000000000000000",
+        "companions": [
+          {"contract_name": "CollateralToken"},
+          {"contract_name": "MiniAMM", "args": ["CollateralToken"]},
+          {"contract_name": "FlashLender"}
+        ],
+        "constructor_args": ["MiniAMM", "CollateralToken", "FlashLender"],
+        "after_deploy": [
+          {
+            "fn": "approve",
+            "args": ["MiniAMM", "10000000000000000000"],
+            "on": "CollateralToken",
+            "from_account": 0
+          },
+          {
+            "fn": "seed",
+            "args": ["10000000000000000000"],
+            "value_wei": "10000000000000000000",
+            "on": "MiniAMM",
+            "from_account": 0
+          },
+          {
+            "fn": "fund",
+            "value_wei": "40000000000000000000",
+            "on": "FlashLender",
+            "from_account": 0
+          },
+          {
+            "fn": "deposit",
+            "value_wei": "20000000000000000000",
+            "on": "target",
+            "from_account": 0
+          }
+        ],
+        "benign": [
+          {"fn": "deposit", "value_wei": "1000000000000000000", "from_account": 1}
+        ]
+      }
     }
   ]
 }

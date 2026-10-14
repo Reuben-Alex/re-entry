@@ -19,6 +19,7 @@ from dashboard.runner import (
     deploy_contracts,
     get_session,
     load_all_results,
+    start_custom_run,
     start_run,
     start_suite,
 )
@@ -155,6 +156,11 @@ class RunSuiteRequest(BaseModel):
     tier: str = "held_out_sealed"
 
 
+class CustomRunRequest(BaseModel):
+    source: str
+    contract_name: str | None = None
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     raw = load_all_results()
@@ -267,6 +273,22 @@ async def api_run_suite(body: RunSuiteRequest):
     try:
         session = start_suite(body.tier)
         return {"run_id": session.run_id, "tier": body.tier}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/run-custom")
+async def api_run_custom(body: CustomRunRequest):
+    if config.SANDBOX_MODE.lower() != "contree":
+        anvil = check_anvil()
+        if not anvil.get("connected"):
+            raise HTTPException(
+                status_code=503,
+                detail="Anvil not running. Start: anvil --port 8545",
+            )
+    try:
+        session = start_custom_run(body.source, body.contract_name)
+        return {"run_id": session.run_id, "target": session.target}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

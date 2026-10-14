@@ -8,10 +8,8 @@ from pathlib import Path
 from queue import Empty, Queue
 from typing import Any
 
-from web3 import Web3
-
 from orchestrator import challenges, config
-from orchestrator.chain import compile_contract_path, deploy, get_web3
+from orchestrator.chain import get_web3
 from orchestrator.loop import run_pipeline
 from orchestrator.preflight import load_deployed
 from orchestrator.sandbox import create_sandbox
@@ -86,31 +84,9 @@ def check_anvil() -> dict:
 
 def deploy_contracts() -> dict:
     """Deploy all manifest contracts to local Anvil."""
-    w3 = get_web3(config.LOCAL_RPC_URL)
-    deployer = w3.eth.accounts[0]
-    depositors = w3.eth.accounts[1:4]
-    amount = Web3.to_wei(1, "ether")
+    from orchestrator.setup import deploy_all
 
-    deployed = {}
-    for target in challenges.list_deployable():
-        try:
-            source_path = challenges.resolve_source_path(target)
-        except FileNotFoundError:
-            if target.tier == "held_out_live":
-                continue
-            raise
-        cname = target.solidity_contract_name
-        abi, bytecode = compile_contract_path(source_path, cname)
-        contract = deploy(w3, abi, bytecode, deployer)
-        for depositor in depositors:
-            tx = contract.functions.deposit().transact(
-                {"from": depositor, "value": amount}
-            )
-            w3.eth.wait_for_transaction_receipt(tx)
-        deployed[target.name] = {"address": contract.address, "abi": abi}
-
-    DEPLOYED_PATH.write_text(json.dumps(deployed, indent=2))
-    return deployed
+    return deploy_all()
 
 
 def _run_target(session: RunSession) -> None:
@@ -239,6 +215,118 @@ def start_run(target: str) -> RunSession:
         _sessions[run_id] = session
         _session_created[run_id] = time.time()
     thread = threading.Thread(target=_run_target, args=(session,), daemon=True)
+    thread.start()
+    return session
+
+
+MAX_CUSTOM_CHARS = 40000
+
+
+def _guess_contract_name(source: str) -> str:
+    import re
+
+    names = re.findall(r"^\s*contract\s+(\w+)", source, re.MULTILINE)
+    if not names:
+        raise ValueError("No contract declaration found in source")
+    return names[-1]
+
+
+def _run_custom(session: RunSession, source: str, contract_name: str) -> None:
+    """Compile a pasted contract onto local Anvil and run the same pipeline."""
+    try:
+        from web3 import Web3
+
+        from orchestrator.chain import compile_source_code, deploy, get_web3
+        from orchestrator.recon import map_functions
+        from orchestrator.setup import default_benign
+        from orchestrator.sandbox import create_sandbox
+
+        session.emit("log", level="info", message=f"custom · compiling {contract_name}")
+        w3 = get_web3(config.LOCAL_RPC_URL)
+        deployer = w3.eth.accounts[0]
+        abi, bytecode = compile_source_code(source, contract_name)
+        contract = deploy(w3, abi, bytecode, deployer)
+        functions = {item["name"]: item for item in map_functions(abi)}
+        funded = False
+        if "deposit" in functions and not functions["deposit"]["inputs"]:
+            amount = Web3.to_wei(1, "ether")
+            for account in w3.eth.accounts[1:4]:
+                tx_hash = contract.functions.deposit().transact(
+                    {"from": account, "value": amount}
+                )
+                w3.eth.wait_for_transaction_receipt(tx_hash)
+            funded = True
+        balance = w3.eth.get_balance(contract.address)
+        benign = default_benign(abi)
+        sandbox = create_sandbox()
+        sandbox.run_context = {
+            "preflight_min_wei": 0 if balance == 0 else int(Web3.to_wei(1, "ether")),
+            "benign": benign,
+            "schedule_note": "",
+            "after_attack": [],
+            "tokens": {},
+            "observations": {},
+            "deploy_plan": {
+                "companions": [],
+                "primary": contract_name,
+                "constructor_args": [],
+                "abi_contract": contract_name,
+                "after_deploy": [],
+                "fund": (
+                    {
+                        "fn": "deposit",
+                        "amount_wei": int(Web3.to_wei(1, "ether")),
+                        "accounts": [1, 2, 3],
+                    }
+                    if funded
+                    else None
+                ),
+                "benign": benign,
+                "signer": deployer,
+            },
+        }
+        session.emit(
+            "log",
+            level="cmd",
+            message=f"re-entry run --target {contract_name} --custom",
+        )
+        report = run_pipeline(
+            contract_name,
+            abi,
+            source,
+            sandbox,
+            contract.address,
+            deployer,
+            on_event=session.emit,
+            deploy_fn=None,
+        )
+        report["challenge_tier"] = "custom"
+        report["target_address"] = contract.address
+        session.report = report
+        _save_result(contract_name, report)
+        session.done = True
+    except Exception as exc:
+        session.error = str(exc)
+        session.emit("error", message=str(exc))
+        session.done = True
+
+
+def start_custom_run(source: str, contract_name: str | None = None) -> RunSession:
+    """Start a pipeline run against user-pasted Solidity."""
+    _purge_stale_sessions()
+    if not source or not source.strip():
+        raise ValueError("Paste a Solidity contract first")
+    if len(source) > MAX_CUSTOM_CHARS:
+        raise ValueError(f"Source exceeds {MAX_CUSTOM_CHARS} characters")
+    name = (contract_name or "").strip() or _guess_contract_name(source)
+    run_id = uuid.uuid4().hex[:12]
+    session = RunSession(run_id=run_id, target=name)
+    with _lock:
+        _sessions[run_id] = session
+        _session_created[run_id] = time.time()
+    thread = threading.Thread(
+        target=_run_custom, args=(session, source, name), daemon=True
+    )
     thread.start()
     return session
 

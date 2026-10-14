@@ -10,11 +10,8 @@ Tavily is on the **critical path**, not a decorative citation dump.
    exploit-proposal prompt so the generated Solidity is grounded in real
    historical strategy, not only static source pattern matching.
 
-2. **Revert-error research** (`find_fix_for_error`)  
-   When an agent-generated exploit reverts on-chain, the cleaned revert reason
-   is sent to Tavily. Those snippets feed the **next** Ultra attempt — closing
-   the plan → write → test → iterate loop judges want in Coding & Agentic
-   Engineering.
+2. **Revert and trace research** (`find_fix_for_error`, plus the Anvil call trace)
+   When an agent-generated exploit reverts, the cleaned revert reason is sent to Tavily and the next Ultra attempt also receives a short `debug_traceCall` / `debug_traceTransaction` tree. The search is tied to the live failure, not a generic "smart contract security" query.
 
 ## Why this is a strong Tavily use
 

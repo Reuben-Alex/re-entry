@@ -8,6 +8,8 @@ cache/
 node_modules/
 broadcast/
 *.log
-results/
+results/*
+!results/.gitkeep
+!results/benchmark.json
 deployed_contracts.json
 brag-output/work/

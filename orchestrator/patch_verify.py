@@ -32,6 +32,9 @@ class PatchVerification:
     vault_balance_before: int
     vault_balance_after: int
     duration_s: float
+    benign_ok: bool = False
+    benign_error: str | None = None
+    verified: bool = False
 
 
 def build_replay_descriptor(
@@ -46,20 +49,8 @@ def build_replay_descriptor(
             proposal=winning_proposal,
             target_name=target_name,
         )
-    if "Treasury" in target_name and not target_name.startswith("Safe"):
-        return ReplayDescriptor(
-            kind="fallback_treasury_direct",
-            proposal=None,
-            target_name=target_name,
-        )
-    if "Escrow" in target_name and not target_name.startswith("Safe"):
-        return ReplayDescriptor(
-            kind="fallback_escrow_release",
-            proposal=None,
-            target_name=target_name,
-        )
     return ReplayDescriptor(
-        kind="fallback_reentrancy",
+        kind="fallback",
         proposal=None,
         target_name=target_name,
     )
@@ -75,6 +66,40 @@ def _fund_patched_contract(w3, contract, deployer: str) -> None:
         w3.eth.wait_for_transaction_receipt(tx_hash)
 
 
+def _run_benign(sandbox, contract) -> tuple[bool, str | None]:
+    """Honest deposit/withdraw steps must still succeed on the patched contract."""
+    steps = (getattr(sandbox, "run_context", None) or {}).get("benign") or []
+    if not steps:
+        return True, None
+    from orchestrator.setup import _call_step
+
+    try:
+        for step in steps:
+            _call_step(sandbox.w3, contract, step, {}, "")
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _deploy_patched(sandbox, patch: PatchProposal, deployer: str):
+    plan = (getattr(sandbox, "run_context", None) or {}).get("deploy_plan")
+    if plan:
+        from orchestrator.setup import redeploy_from_source
+
+        return redeploy_from_source(
+            sandbox.w3, patch.patched_source, plan, deployer
+        )
+    patched = chain.deploy(
+        sandbox.w3,
+        patch.abi,
+        patch.bytecode,
+        deployer,
+        constructor_args=[],
+    )
+    _fund_patched_contract(sandbox.w3, patched, deployer)
+    return patched
+
+
 def verify_patch(
     sandbox,
     replay: ReplayDescriptor,
@@ -82,9 +107,10 @@ def verify_patch(
     deployer: str,
 ) -> PatchVerification:
     """
-    Deploy patched contract, fund it, replay winning exploit.
+    Deploy the patched contract, replay the exploit, then run the benign script.
 
-    Pass when exploit no longer drains the patched contract.
+    A patch is verified only when the exploit no longer profits and honest use
+    still succeeds.
     """
     start = time.time()
     sandbox.fork_checkpoint()
@@ -95,25 +121,17 @@ def verify_patch(
     deployed_address = None
     vault_before = 0
     vault_after = 0
+    benign_ok = False
+    benign_error = None
 
     try:
-        patched = chain.deploy(
-            w3,
-            patch.abi,
-            patch.bytecode,
-            deployer,
-            constructor_args=[],
-        )
+        patched = _deploy_patched(sandbox, patch, deployer)
         deployed_address = patched.address
-        _fund_patched_contract(w3, patched, deployer)
         vault_before = sandbox.get_balance(deployed_address)
-
-        # Non-owner account proves access-control patches block unauthorized drain.
-        replay_sender = deployer
-        if replay.target_name.startswith("Safe"):
-            replay_sender = deployer
-        elif "Treasury" in replay.target_name or "Escrow" in replay.target_name:
-            replay_sender = w3.eth.accounts[5]
+        snap = w3.provider.make_request("evm_snapshot", [])["result"]
+        benign_ok, benign_error = _run_benign(sandbox, patched)
+        w3.provider.make_request("evm_revert", [snap])
+        replay_sender = w3.eth.accounts[5]
 
         if replay.kind == "agent_proposal" and replay.proposal:
             result, _ = executor.execute_proposal(
@@ -124,9 +142,6 @@ def verify_patch(
                 deployer,
                 sender=replay_sender,
             )
-            replay_success = result.success
-            revert_reason = result.revert_reason
-            vault_after = result.vault_balance_after
         else:
             result, _ = executor.fallback_exploit(
                 sandbox,
@@ -136,17 +151,17 @@ def verify_patch(
                 target_name=replay.target_name,
                 sender=replay_sender,
             )
-            replay_success = result.success
-            revert_reason = result.revert_reason
-            vault_after = result.vault_balance_after
-
+        replay_success = result.success
+        revert_reason = result.revert_reason
+        vault_after = result.vault_balance_after
     except Exception as exc:
         revert_reason = str(exc)
         vault_after = (
             sandbox.get_balance(deployed_address) if deployed_address else vault_before
         )
 
-    exploit_blocked = not outcome.is_drained(vault_before, vault_after)
+    exploit_blocked = not replay_success
+    verified = exploit_blocked and benign_ok
 
     return PatchVerification(
         compiles=True,
@@ -157,6 +172,9 @@ def verify_patch(
         vault_balance_before=vault_before,
         vault_balance_after=vault_after,
         duration_s=time.time() - start,
+        benign_ok=benign_ok,
+        benign_error=benign_error,
+        verified=verified,
     )
 
 

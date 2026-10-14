@@ -61,7 +61,7 @@ def _run_patch_verify(
         emit(
             on_event,
             "patch_verify_done",
-            verified=verification.exploit_blocked,
+            verified=verification.verified,
             replay_success=verification.replay_success,
         )
 
@@ -74,13 +74,13 @@ def _run_patch_verify(
             "oz_pattern": getattr(patch_proposal, "oz_pattern", "")
             or patcher.infer_oz_pattern(patch_proposal.patched_source),
             "verification": verification_to_dict(verification),
-            "patch_verified": verification.exploit_blocked,
+            "patch_verified": verification.verified,
         }
-        report_data["patch_verified"] = verification.exploit_blocked
+        report_data["patch_verified"] = verification.verified
         report_data["patch_diff"] = report_data["patch"]["diff"]
         report_data["patch_reasoning"] = patch_proposal.reasoning
         report_data["patch_status"] = (
-            "verified" if verification.exploit_blocked else "failed"
+            "verified" if verification.verified else "failed"
         )
     except Exception as exc:
         emit(on_event, "patch_failed", message=str(exc))
@@ -139,6 +139,32 @@ def _empty_failure_report(
     }
 
 
+def _sync_context(sandbox, target_name: str, force: bool = False) -> None:
+    """Load deploy context so profit checks and schedules see the manifest."""
+    if not force and getattr(sandbox, "run_context", None):
+        return
+    from orchestrator.preflight import load_deployed
+    from orchestrator.setup import attach_context
+
+    deployed = load_deployed()
+    entry = deployed.get(target_name)
+    if entry:
+        attach_context(sandbox, entry)
+
+
+def _preflight_min(sandbox) -> int | None:
+    context = getattr(sandbox, "run_context", None) or {}
+    if "preflight_min_wei" not in context:
+        return None
+    return int(context["preflight_min_wei"])
+
+
+def _sandbox_notes(sandbox) -> str:
+    from orchestrator.setup import format_sandbox_notes
+
+    return format_sandbox_notes(getattr(sandbox, "run_context", None))
+
+
 def run_pipeline(
     target_name: str,
     abi: list,
@@ -153,21 +179,30 @@ def run_pipeline(
     pipeline_start = time.time()
     step_timings = []
     emit(on_event, "pipeline_start", target=target_name)
+    _sync_context(sandbox, target_name)
 
     emit(on_event, "preflight_start", target=target_name)
     try:
         if deploy_fn is not None:
             preflight = ensure_target_funded(
-                sandbox, target_name, vault_address, deploy_fn
+                sandbox,
+                target_name,
+                vault_address,
+                deploy_fn,
+                min_wei=_preflight_min(sandbox),
             )
             vault_address = preflight["address"]
             if preflight["redeployed"]:
+                _sync_context(sandbox, target_name, force=True)
                 emit(on_event, "preflight_redeploy", message="Contracts redeployed")
         else:
             from orchestrator.preflight import _get_balance, MIN_BALANCE_WEI
 
             balance = _get_balance(sandbox, vault_address)
-            if balance < MIN_BALANCE_WEI:
+            threshold = _preflight_min(sandbox)
+            if threshold is None:
+                threshold = MIN_BALANCE_WEI
+            if threshold > 0 and balance < threshold:
                 raise PreflightError(
                     f"Target unfunded ({balance} wei)",
                     verdict="unfunded_target",
@@ -238,6 +273,7 @@ def run_pipeline(
                 prior_failure,
                 abi=abi,
                 target_name=target_name,
+                sandbox_notes=_sandbox_notes(sandbox),
             )
             emit(
                 on_event,
@@ -307,6 +343,7 @@ def run_pipeline(
                 result.vault_balance_after,
                 result.attacker_balance_before,
                 result.attacker_balance_after,
+                token_gain=result.token_gain,
             )
             patch_data = _run_patch_verify(
                 on_event,
@@ -351,12 +388,18 @@ def run_pipeline(
             "revert_reason": clean_reason,
             "research": fix_research,
             "previous_source": proposal.solidity_source if proposal else "",
+            "trace": result.trace,
         }
 
     emit(on_event, "fallback_start", attempt="final", note="ABI safety net only")
     sandbox.fork_checkpoint()
     fallback_result, fallback_timing = executor.fallback_exploit(
-        sandbox, vault_address, abi, deployer, target_name=target_name
+        sandbox,
+        vault_address,
+        abi,
+        deployer,
+        target_name=target_name,
+        sender=sandbox.w3.eth.accounts[5],
     )
     attempt_history.append(
         {
@@ -375,6 +418,7 @@ def run_pipeline(
             fallback_result.vault_balance_after,
             fallback_result.attacker_balance_before,
             fallback_result.attacker_balance_after,
+            token_gain=fallback_result.token_gain,
         )
         patch_data = _run_patch_verify(
             on_event,

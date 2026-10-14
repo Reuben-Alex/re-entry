@@ -39,7 +39,7 @@ SANDBOX_MODE = os.environ.get("SANDBOX_MODE", "local")
 
 MAX_RETRY_ATTEMPTS = int(os.environ.get("MAX_RETRY_ATTEMPTS", "3"))
 MAX_COMPILE_RETRIES = int(os.environ.get("MAX_COMPILE_RETRIES", "3"))
-LLM_TIMEOUT_SECONDS = int(os.environ.get("LLM_TIMEOUT_SECONDS", "60"))
+LLM_TIMEOUT_SECONDS = int(os.environ.get("LLM_TIMEOUT_SECONDS", "180"))
 ENABLE_PATCH_VERIFY = os.environ.get("ENABLE_PATCH_VERIFY", "true").lower() == "true"
 INCLUDE_BLIND = os.environ.get("INCLUDE_BLIND", "").lower() == "true"
 

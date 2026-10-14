@@ -37,6 +37,7 @@ def ensure_target_funded(
     target_name: str,
     vault_address: str,
     deploy_fn,
+    min_wei: int | None = None,
 ) -> dict:
     """
     Verify target holds at least MIN_BALANCE_WEI; redeploy all demos if not.
@@ -49,8 +50,16 @@ def ensure_target_funded(
     """
     balance = _get_balance(sandbox, vault_address)
     redeployed = False
+    threshold = MIN_BALANCE_WEI if min_wei is None else min_wei
 
-    if balance < MIN_BALANCE_WEI:
+    if threshold <= 0:
+        return {
+            "balance_wei": balance,
+            "redeployed": False,
+            "address": vault_address,
+        }
+
+    if balance < threshold:
         deploy_fn()
         redeployed = True
         deployed = load_deployed()
@@ -62,10 +71,10 @@ def ensure_target_funded(
         vault_address = deployed[target_name]["address"]
         balance = _get_balance(sandbox, vault_address)
 
-    if balance < MIN_BALANCE_WEI:
+    if balance < threshold:
         raise PreflightError(
             f"Target {target_name} at {vault_address} has {balance} wei "
-            f"(need ≥ {MIN_BALANCE_WEI}). Redeploy Anvil and run deploy_demo_contracts.",
+            f"(need ≥ {threshold}). Redeploy Anvil and run deploy_demo_contracts.",
             verdict="unfunded_target",
         )
 

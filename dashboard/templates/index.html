@@ -151,7 +151,7 @@
     }
 
     /* Targets sidebar */
-    .target-list { padding: .5rem; flex: 1; overflow-y: auto; }
+    .target-list { padding: .5rem .5rem 8rem; flex: 1; min-height: 0; overflow-y: auto; }
     .target-btn {
       width: 100%;
       text-align: left;
@@ -175,10 +175,20 @@
     .target-btn .badge {
       float: right;
       font-size: .65rem;
-      padding: .1rem .4rem;
-      border-radius: 4px;
-      margin-top: .1rem;
     }
+    .custom-box { flex-shrink: 0; padding: .75rem .85rem 0; }
+    .custom-box textarea, .custom-box input {
+      width: 100%;
+      margin-bottom: .4rem;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: .68rem;
+      padding: .4rem;
+    }
+    .custom-box textarea { min-height: 7rem; resize: vertical; }
     .badge-ok { background: rgba(74,222,128,.12); color: var(--green); }
     .badge-warn { background: rgba(251,191,36,.12); color: var(--yellow); }
     .badge-fail { background: rgba(248,113,113,.12); color: var(--red); }
@@ -429,6 +439,12 @@
       {% endfor %}
       {% endif %}
       {% endfor %}
+      <div class="custom-box">
+        <div class="target-group-label">Your contract</div>
+        <textarea id="custom-source" placeholder="Paste Solidity. It runs only on the local Anvil sandbox."></textarea>
+        <input id="custom-name" type="text" placeholder="Contract name (optional)" />
+        <button class="btn btn-run" id="btn-custom" type="button">▶ Run my contract</button>
+      </div>
     </div>
     <div class="actions actions-sticky">
       <button class="btn btn-secondary" id="btn-deploy">Deploy all</button>
@@ -878,6 +894,35 @@
       appendLine('error', e.message);
     }
     btn.disabled = false;
+  });
+
+  document.getElementById('btn-custom').addEventListener('click', async () => {
+    if (running) return;
+    const source = document.getElementById('custom-source').value;
+    const contractName = document.getElementById('custom-name').value.trim();
+    running = true;
+    const btn = document.getElementById('btn-custom');
+    btn.disabled = true;
+    selectedTarget = contractName || 'Custom contract';
+    document.getElementById('active-target').textContent = selectedTarget;
+    clearTerminal();
+    intelState = { contract_name: selectedTarget };
+    try {
+      const res = await fetch('/api/run-custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source, contract_name: contractName || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'run failed');
+      selectedTarget = data.target || selectedTarget;
+      document.getElementById('active-target').textContent = selectedTarget;
+      connectRunStream(data.run_id, () => { btn.disabled = false; });
+    } catch (e) {
+      appendLine('error', e.message);
+      running = false;
+      btn.disabled = false;
+    }
   });
 
   document.getElementById('btn-run').addEventListener('click', async () => {

@@ -28,12 +28,13 @@ RULES:
   (ReentrancyGuard/nonReentrant, Ownable/onlyOwner, AccessControl, checks-effects-interactions).
   Do NOT import OpenZeppelin — inline the equivalent minimal pattern.
 
-PATTERN FIXES (canonical targets):
-- reentrancy (OWASP SC05): checks-effects-interactions — update state BEFORE external calls;
-  optionally add a simple nonReentrant-style mutex
-- access_control (OWASP SC01): add onlyOwner / require(msg.sender == owner) on
-  privileged functions (changeOwner, withdrawAll, initialize, etc.)
-- logic|escrow: ensure release pays the beneficiary (or only the depositor), not msg.sender
+PATTERN FIXES (apply only what the source and the exploit show):
+- external call before state update: update state first, or share one lock across every function that moves the same balance
+- missing caller check: restrict the privileged action to the recorded owner, and let a setup function succeed only once
+- payment to the caller: pay the recorded account
+- price or share math the caller can move: reject zero-share deposits and do not trust a same-transaction spot price
+- signature with no nonce: bind the digest to the caller and a nonce, and store used digests
+Honest users must still be able to deposit and withdraw their own funds.
 
 In reasoning, name the OpenZeppelin-equivalent pattern you matched (e.g. "Ownable.onlyOwner",
 "ReentrancyGuard / CEI").

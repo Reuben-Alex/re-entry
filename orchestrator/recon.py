@@ -131,12 +131,24 @@ def _heuristic_risk_flags(source_code: str) -> list[dict]:
     return flags
 
 
+def _rank_flags(flags: list) -> list[dict]:
+    """Keep dict flags and sort them by confidence, highest first."""
+    cleaned = [flag for flag in flags if isinstance(flag, dict)]
+    cleaned.sort(key=lambda flag: float(flag.get("confidence") or 0), reverse=True)
+    for index, flag in enumerate(cleaned, start=1):
+        flag["rank"] = index
+    return cleaned
+
+
 def flag_risk_patterns(
     function_summaries: list[dict],
     source_code: str,
 ) -> tuple[list[dict], dict]:
     """
-    Call Nano to flag risk patterns. Returns (flags, timing_info).
+    Call Nano for ranked hypotheses. Returns (flags, timing_info).
+
+    function_name values are taken from the source. The list is ordered
+    by confidence so the proposer sees the leading hypothesis first.
     """
     timing = {"step": "recon", "duration_s": 0.0, "model": config.MODEL_NANO}
     start = time.time()
@@ -144,9 +156,9 @@ def flag_risk_patterns(
     if not config.MODEL_NANO or not config.NEBIUS_API_KEY:
         timing["duration_s"] = time.time() - start
         timing["fallback"] = True
-        return _heuristic_risk_flags(source_code), timing
+        return _rank_flags(_heuristic_risk_flags(source_code)), timing
 
-    prompt = f"""Analyze this Solidity contract and flag vulnerability patterns.
+    prompt = f"""Analyze this Solidity contract and return ranked hypotheses.
 
 FUNCTION SUMMARIES:
 {json.dumps(function_summaries, indent=2)}
@@ -154,7 +166,12 @@ FUNCTION SUMMARIES:
 SOURCE CODE:
 {source_code}
 
-Return JSON: {{"risk_flags": [{{"function_name": "...", "risk_pattern": "reentrancy|access_control|oracle_manipulation|...", "confidence": 0.0-1.0, "reasoning": "..."}}]}}
+Return JSON: {{"risk_flags": [{{"function_name": "...", "risk_pattern": "reentrancy|access_control|oracle_manipulation|signature_replay|share_inflation|logic|general", "confidence": 0.0-1.0, "reasoning": "..."}}]}}
+
+Rules:
+- Order risk_flags from highest confidence to lowest.
+- function_name must be copied from a function in the source. Do not invent names.
+- reasoning must cite what the source does, in one or two sentences.
 """
     try:
         client = _get_client()
@@ -178,8 +195,8 @@ Return JSON: {{"risk_flags": [{{"function_name": "...", "risk_pattern": "reentra
         if not isinstance(flags, list):
             flags = []
         timing["duration_s"] = time.time() - start
-        return flags, timing
+        return _rank_flags(flags), timing
     except Exception:
         timing["duration_s"] = time.time() - start
         timing["fallback"] = True
-        return _heuristic_risk_flags(source_code), timing
+        return _rank_flags(_heuristic_risk_flags(source_code)), timing

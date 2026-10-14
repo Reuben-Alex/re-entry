@@ -18,19 +18,23 @@ Static analyzers guess. Audits pattern-match. **Re-entry proves** a smart-contra
 ## Judging criteria mapping
 
 ### Technological Implementation
-- Three Nemotron tiers on Token Factory with distinct roles (Nano recon / Ultra exploit+patch / Super report).
-- Compile-retry loop; revert-reason → Tavily research → revised proposal.
-- Honest verdicts: `vulnerable_agent_generated` vs labeled ABI `vulnerable_fallback` vs `no_exploit_found`.
-- Benchmarked: Ultra agent-generated success **3/3** on VulnerableVault and VulnerableTreasury with **0 fallbacks**.
+- Three Nemotron tiers on Token Factory with distinct roles (Nano ranked hypotheses / Ultra exploit+patch / Super report).
+- One generic Ultra prompt: source, ABI, hypotheses, Tavily, and the prior revert plus Anvil call trace. It does not name target functions.
+- Honest verdicts: `vulnerable_agent_generated` vs labeled ABI `vulnerable_fallback` vs `no_exploit_found`. Fallback is excluded from the agent-success rate.
+- One recorded pass (`python scripts/benchmark_pipeline.py 1`): **agent-generated 5/13** non-control runs, **fallback 2** (VulnerableVault, VulnerableEscrow), **other 6**. Controls: **13/13** `no_exploit_found`.
+- Agent wins in that pass: VulnerableTreasury, VulnerableBlind, HookVault, plus attributed FallbackBank and NaiveFeeVault. Published misses: cross-function reentrancy, share inflation, uninitialized proxy, signature replay, flash-loan spot price, and the oracle vault. Hand-written exploits in `tests/test_new_targets.py` still prove those bugs.
+- A patch is verified only when the replay no longer profits and a benign deposit/withdraw still succeeds.
+- Scoreboard: `results/benchmark.json`. Headline: agent-generated 5/13 on non-control runs; fallback 2; other 6. Controls are scored separately and were clean.
 
 ### Design
 - Live dashboard Story / Decision log / Solution / Exploit / Research tabs.
+- "Run my contract" pastes Solidity onto the local sandbox and streams the same loop.
 - One-command `scripts/demo.sh`; Docker deploy under `deploy/`.
 - 15–25s `/brag` launch clip + ≤3 min submission walkthrough.
 
 ### Potential Impact
-- Template for agentic “prove then patch” tooling that auditors and protocol teams could run in CI sandboxes.
-- Comparable coverage scores on attributed benchmark tier; blind claims reserved for authored held-out (e.g. VulnerableBlind).
+- Auditors and protocol teams can point the same loop at a contract they paste in, inside a sandbox, before anything is deployed.
+- Comparable coverage scores on the attributed benchmark tier. Blind claims are reserved for the authored held-out set (cross-function reentrancy, token hook, share inflation, uninitialized proxy, signature replay, flash-loan spot price).
 
 ### Quality of the Idea
 - Proof-by-execution, not lint rules.
@@ -45,3 +49,4 @@ Nebius Token Factory · NVIDIA Nemotron 3 · Tavily · Foundry/Anvil · web3.py 
 - Demo URL (dashboard)
 - YouTube ≤3 min (audio names Token Factory + Nemotron at each step)
 - Best Use of Tavily writeup: [docs/TAVILY.md](TAVILY.md)
+- Token Factory feedback: [docs/FEEDBACK.md](FEEDBACK.md)

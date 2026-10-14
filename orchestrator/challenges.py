@@ -21,6 +21,7 @@ class ChallengeTarget:
     source: str
     control: str | None = None
     contract_name: str | None = None
+    setup: dict | None = None
 
     @property
     def solidity_contract_name(self) -> str:
@@ -42,6 +43,7 @@ def load_manifest() -> list[ChallengeTarget]:
                 source=entry["source"],
                 control=entry.get("control"),
                 contract_name=entry.get("contract_name"),
+                setup=entry.get("setup"),
             )
         )
     return out

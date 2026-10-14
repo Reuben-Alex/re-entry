@@ -22,9 +22,9 @@ Open http://127.0.0.1:8000 (or your public demo URL).
 | 0:15–0:35 | Dashboard Challenges | “On Nebius Token Factory we use three NVIDIA Nemotron models: Nano for recon, Ultra for exploit and patch generation, and Super for the evidence report.” |
 | 0:35–1:10 | Run VulnerableVault live | “Nano flags reentrancy. Tavily pulls historical DAO-style precedent. Ultra writes a fresh Solidity exploit — not our hand-written Attacker.sol — and Anvil executes it. Watch the vault drain.” |
 | 1:10–1:35 | Story + Solution tabs | “Verdict is vulnerable_agent_generated — agent-generated, no fallback. Ultra then emits a minimal patch aligned with OpenZeppelin checks-effects-interactions. We redeploy and replay the same exploit; it fails. Find, prove, fix, verify.” |
-| 1:35–2:10 | Held-out VulnerableBlind | “Blind held-out target: missing access control on changeOwner. Our ABI safety-net fallback will not chain privilege escalation — Ultra has to write the multi-step exploit itself.” |
-| 2:10–2:35 | SafeVault control | “Control case SafeVault — correctly reports no_exploit_found. The agent isn’t just pattern-matching function names.” |
-| 2:35–2:55 | Benchmark note / Decision log | “Attributed Ethernaut- and Damn-Vulnerable-DeFi-inspired benchmarks measure coverage; authored held-out contracts measure blind reasoning. Decision log shows Nano → Tavily → Ultra → execute → patch.” |
+| 1:35–2:05 | Paste box, or run OpenProxy / ReplayVault / SpotLending | “Held-out target. The prompt does not name the functions. Ultra has to read the source. Watch the verdict: agent-generated, or an honest miss.” |
+| 2:05–2:25 | SafeVault control | “Control case. The scoreboard counts no_exploit_found here, separate from agent success.” |
+| 2:25–2:50 | Solution tab on a verified patch | “Patch verified means the replay no longer profits and a normal deposit and withdraw still succeed.” |
 | 2:55–3:00 | End card | “Re-entry — prove the bug, prove the fix, on Token Factory with Nemotron.” |
 
 ## Checklist

@@ -20,6 +20,8 @@ holds.
 
 **Lifecycle: find → prove → fix → verify.**
 
+The exploit prompt is one generic brief. It receives the source, the ABI, Nano's ranked hypotheses, Tavily notes, and the previous revert plus an Anvil call trace. It does not name the target's functions. A run counts as success when the attacker gains ETH or a tracked token, or the target's ETH balance falls. A patch is verified only when that same exploit no longer profits and a normal deposit and withdraw still work.
+
 MIT licensed. See [LICENSE](./LICENSE).
 
 ---
@@ -49,26 +51,28 @@ sandbox.
 
 ---
 
-## 1. Status — verified, working
+## 1. Status — scoreboard is the JSON
 
-The full pipeline runs end-to-end against real Nemotron models. Measured
-results ([`results/benchmark.json`](results/benchmark.json)):
+The pipeline runs against real Nemotron models on Nebius Token Factory. The numbers judges should trust are in [`results/benchmark.json`](results/benchmark.json), from one pass of:
 
-- **`VulnerableVault` (reentrancy): 3/3 agent-generated exploits succeed, 0
-  fallbacks.** Avg ~34s/run.
-- **`VulnerableTreasury` (access control): 3/3 agent-generated exploits
-  succeed, 0 fallbacks.** Avg ~13s/run.
+```bash
+python scripts/benchmark_pipeline.py 1
+```
 
-The generated exploit is genuinely LLM-authored (distinct from the
-hand-written [`Attacker.sol`](contracts/Attacker.sol) safety net), Nano flags
-the bug with correct reasoning, and Tavily returns real precedent (OWASP
-SC05, Nethermind, Pessimistic, etc.).
+Headline: **agent-generated 5/13** on non-control runs, **fallback 2**, **other 6**. Fallback wins are not agent successes. All **13/13** control contracts were `no_exploit_found`.
 
-**Verdict values** (honest by design — the pipeline decides, not the LLM):
-`vulnerable_agent_generated` | `vulnerable_fallback` | `no_exploit_found`
+An attempt counts only when the attacker nets ETH or a tracked token (or a declared invariant breaks). A vault balance drop from an honest withdraw or borrow does not count. The hand-written ABI fallback is scored on its own and does not chain privilege escalation, cross-function reentrancy, signature replay, or the flash-loan spot manipulation.
 
-**Model split:** Nano (recon) → Ultra (exploit + patch generation) → Super
-(evidence report)
+| Target | Outcome |
+|---|---|
+| VulnerableTreasury, VulnerableBlind, HookVault | agent |
+| FallbackBank, NaiveFeeVault (attributed) | agent |
+| VulnerableVault, VulnerableEscrow | labeled ABI fallback |
+| VulnerableOracleVault, CrossFunctionVault, InflatingVault, OpenProxy, ReplayVault, SpotLending | no exploit this run |
+
+The misses are published on purpose. `tests/test_new_targets.py` still shows a hand-written exploit for the cross-function, hook, inflation, proxy, replay, and spot-lending bugs. The agent found the hook and missed the others in this single pass.
+
+**Model split:** Nano (ranked hypotheses) → Ultra (exploit + patch, generic prompt) → Super (evidence report)
 
 | Piece | What it does |
 |---|---|
@@ -79,7 +83,7 @@ SC05, Nethermind, Pessimistic, etc.).
 | `orchestrator/executor.py` | Deploys + runs generated exploits; hand-written fallback as safety net. |
 | `orchestrator/loop.py` | Full propose → compile → execute → retry → fallback pipeline. |
 | `orchestrator/patcher.py` | Ultra generates a minimal patch + unified diff. |
-| `orchestrator/patch_verify.py` | Redeploys patched contract, replays exploit, asserts it's blocked. |
+| `orchestrator/patch_verify.py` | Redeploys the patch, replays the exploit, and requires a benign deposit/withdraw to still succeed. |
 | `orchestrator/report.py` | Super evidence report with lifecycle story. |
 | `orchestrator/sandbox.py` / `contree_sandbox.py` | LocalSandbox (Anvil snapshot/revert) + Contree wrapper. |
 | `dashboard/app.py` | FastAPI + Jinja2 live results dashboard. |
@@ -93,7 +97,7 @@ SC05, Nethermind, Pessimistic, etc.).
 recon (Nano) → risk ranking → precedent search (Tavily)
    → exploit proposal (Ultra) → sandbox execution (Anvil/Contree)
    → outcome check → [fail: retry with real revert reason + Tavily, bounded]
-   → [success: patch (Ultra) → redeploy → replay same exploit → verify blocked]
+   → [success: patch (Ultra) → redeploy → replay blocked and benign use still works]
    → evidence report (Super) → dashboard
 ```
 
@@ -144,9 +148,9 @@ Challenge tiers ([`challenges/manifest.json`](challenges/manifest.json)):
 | Tier | Examples | In repo |
 |------|----------|---------|
 | `train` | VulnerableVault | Full source in `contracts/` |
-| `held_out_sealed` | VulnerableTreasury, VulnerableEscrow | Comment-free `challenges/sealed/` |
+| `held_out_sealed` | VulnerableTreasury, VulnerableEscrow, CrossFunctionVault, HookVault, InflatingVault, OpenProxy, ReplayVault, SpotLending | Comment-free `challenges/sealed/` |
 | `held_out_live` | Fresh blind contract | `.sol` in `challenges/held_out/` (gitignored until demo) |
-| `control` | SafeVault, SafeTreasury, SafeEscrow | Negative tests — should report `no_exploit_found` |
+| `control` | SafeVault and the safe twin of every held-out target | Negative tests — this run reported `no_exploit_found` on all 13 |
 
 ---
 
@@ -231,8 +235,9 @@ TIER=held_out_live bash scripts/held_out_demo.sh
 
 **Recommended judge flow:**
 1. **VulnerableVault** (`train`) — reentrancy, full lifecycle in the dashboard **Story** tab.
-2. **Held-out suite** — Treasury + Escrow sealed targets (source not shown).
-3. **SafeVault** (`control`) — should honestly report `no_exploit_found`.
+2. **Held-out suite** — sealed targets, including cross-function reentrancy, a token hook, share inflation, an uninitialized proxy, signature replay, and a flash-loan spot-price pool. Source is not the recipe; the prompt does not name their functions.
+3. **Paste a contract** — the "Run my contract" box compiles your Solidity onto the local Anvil and runs the same loop.
+4. **SafeVault** (`control`) — should report `no_exploit_found`.
 
 ---
 
@@ -286,6 +291,6 @@ Two separate assets:
 - [ ] Launch/hook clip (optional) — `brag-output/brag.mp4` from `/brag`
 - [ ] Public repo with OSS license visible (MIT — see [LICENSE](LICENSE)); rotate keys first ([docs/KEY_ROTATION.md](docs/KEY_ROTATION.md))
 - [ ] README with setup + architecture (this file)
-- [ ] Token Factory / AI Cloud / NVIDIA feedback captured during the build
+- [ ] Token Factory / AI Cloud / NVIDIA feedback — [docs/FEEDBACK.md](docs/FEEDBACK.md)
 - [ ] Separate Best Use of Tavily writeup — [docs/TAVILY.md](docs/TAVILY.md)
 - [ ] Benchmark attribution — [benchmarks/THIRD_PARTY_LICENSES.md](benchmarks/THIRD_PARTY_LICENSES.md)

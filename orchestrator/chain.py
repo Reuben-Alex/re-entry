@@ -73,6 +73,21 @@ def compile_source_code(source_code: str, contract_name: str) -> tuple[list, str
     return _extract_contract(normalized, contract_name)
 
 
+def compile_source_map(source_code: str) -> dict[str, tuple[list, str]]:
+    """Compile source and return every contract's ABI and bytecode."""
+    ensure_solc()
+    compiled = compile_source(
+        normalize_pragma(source_code),
+        output_values=["abi", "bin"],
+        solc_version=SOLC_VERSION,
+    )
+    out = {}
+    for key, iface in compiled.items():
+        name = key.split(":")[-1]
+        out[name] = (iface["abi"], iface["bin"])
+    return out
+
+
 def get_web3(rpc_url: str) -> Web3:
     """Connect to an EVM RPC endpoint with localhost guard by default."""
     parsed = urllib.parse.urlparse(rpc_url)

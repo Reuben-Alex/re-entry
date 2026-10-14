@@ -19,6 +19,8 @@ class ExecutionResult:
     revert_reason: str | None
     raw_tx_hashes: list[str] = field(default_factory=list)
     attacker_address: str | None = None
+    trace: str = ""
+    token_gain: int = 0
 
 
 class LocalSandbox:

@@ -1,5 +1,8 @@
 """
 Exploit contract generation — Nemotron Ultra writes Solidity from scratch.
+
+One generic prompt. It receives source, ABI, ranked hypotheses, precedent,
+and the previous revert or trace. It does not name target functions.
 """
 import json
 import time
@@ -14,67 +17,29 @@ from orchestrator.revert import clean_revert_reason
 
 _client = None
 
-REENTRANCY_PROMPT = """You are a smart contract security researcher writing a reentrancy exploit.
+GENERIC_EXPLOIT_PROMPT = """You are a smart contract security researcher writing an exploit for a local sandbox. The target is the contract source in the user message. Do not assume a public network.
 
 CONSTRAINTS:
 - First line: pragma solidity ^0.8.19;
-- constructor(address target) and payable function attack()
-- REQUIRED 3-step pattern:
-  1. attack() deposits >= 1 ether into target via deposit()
-  2. attack() calls target.withdraw() once to start the drain
-  3. receive() external payable re-enters withdraw() while target balance >= 1 ether
-- receive() MUST exist and call withdraw() again (this is the reentrancy hook)
-- Stop re-entering when address(target).balance < 1 ether
-- Send at least 1 ether (1000000000000000000 wei) with attack()
+- constructor(address target) stores the primary contract
+- function attack() external payable is the only entry the sandbox calls
+- You may add receive(), extra functions, and helper contracts in the same source
+- If the sandbox notes say it will call another function on your contract after attack(), include that function
 - No external imports; inline interfaces only
+- Call only functions that exist on the target. Read the source and the ABI.
+- Ranked hypotheses are clues from recon, not a recipe
+- Abstract classes you may recognize while reading the source:
+  - state updated after an external call
+  - a second function that moves the same balance while that call is in progress
+  - a privileged action with no caller check
+  - a payment sent to the caller instead of the recorded account
+  - a price or share calculation the caller can move inside one transaction
+  - a setup function that can be called again
+  - a signed authorization with no nonce, so one signature can be reused
+- If ETH may arrive at your contract, include receive() external payable {}
 - Return JSON: solidity_source, contract_name, entry_function, entry_value_wei, reasoning
 
-REFERENCE SKELETON (structure only):
-  contract Exploit { constructor(address t) { target = t; }
-    function attack() external payable { target.deposit{value: 1 ether}(); target.withdraw(); }
-    receive() external payable { if (address(target).balance >= 1 ether) target.withdraw(); }
-  }
-"""
-
-ACCESS_CONTROL_PROMPT = """You are a smart contract security researcher writing an access-control exploit.
-
-CONSTRAINTS:
-- First line: pragma solidity ^0.8.19;
-- constructor(address target) and function attack() — attack() may be non-payable
-- Common patterns (pick what the TARGET SOURCE actually has):
-  1. withdrawAll() / sweep() with NO owner check — call it directly from attack()
-  2. changeOwner(address) / setOwner / transferOwnership WITHOUT onlyOwner — call
-     changeOwner(address(this)) then withdrawAll() from attack()
-  3. initialize(address) callable by anyone — claim ownership then drain
-- If the target sends ETH to msg.sender, include: receive() external payable {}
-- No external imports; inline interfaces only
-- Return JSON: solidity_source, contract_name, entry_function, entry_value_wei, reasoning
-"""
-
-LOGIC_ESCROW_PROMPT = """You are a smart contract security researcher writing a logic / economic exploit.
-
-CONSTRAINTS:
-- First line: pragma solidity ^0.8.19;
-- constructor(address target) and function attack() — may be payable
-- Patterns to consider from TARGET SOURCE:
-  1. release(address beneficiary) that pays msg.sender from beneficiary's locked balance
-  2. flashFee() / similar permissionless fee pull — call it (repeat if needed) to drain
-  3. contribute() + receive()/fallback that seizes ownership, then withdraw()
-- If ETH is sent to your contract, include receive() external payable {}
-- No external imports; inline interfaces only
-- Return JSON: solidity_source, contract_name, entry_function, entry_value_wei, reasoning
-"""
-
-GENERAL_PROMPT = """You are a smart contract security researcher writing an exploit contract.
-
-CONSTRAINTS:
-- First line: pragma solidity ^0.8.19;
-- constructor(address target) and function attack()
-- Match the vulnerability class indicated in SECURITY ANALYSIS FLAGS
-- Read the TARGET SOURCE carefully — privilege escalation often needs
-  changeOwner/initialize before a privileged withdraw
-- No external imports; inline interfaces only
-- Return JSON: solidity_source, contract_name, entry_function, entry_value_wei, reasoning
+entry_value_wei is the ETH the sandbox attaches to attack(). Use 0 when the exploit needs none.
 """
 
 OWASP_TAXONOMY = (
@@ -106,38 +71,6 @@ def _get_client() -> OpenAI:
             timeout=config.LLM_TIMEOUT_SECONDS,
         )
     return _client
-
-
-def _primary_pattern(risk_flags: list[dict]) -> str:
-    if not risk_flags:
-        return "general"
-    return risk_flags[0].get("risk_pattern", "general").lower()
-
-
-def _system_prompt_for_flags(risk_flags: list[dict]) -> str:
-    pattern = _primary_pattern(risk_flags)
-    if "escrow" in pattern or "logic" in pattern:
-        return LOGIC_ESCROW_PROMPT
-    if "oracle" in pattern:
-        return ORACLE_PROMPT
-    if "access" in pattern:
-        return ACCESS_CONTROL_PROMPT
-    if "reentranc" in pattern:
-        return REENTRANCY_PROMPT
-    return GENERAL_PROMPT
-
-
-ORACLE_PROMPT = """You are a smart contract security researcher writing an oracle-manipulation exploit.
-
-CONSTRAINTS:
-- First line: pragma solidity ^0.8.19;
-- constructor(address target) and function attack() payable
-- Typical pattern: deposit() some ETH, call setPrice(inflated), then withdraw()
-  to redeem shares at the manipulated price and drain the vault
-- Include receive() external payable {} if needed
-- No external imports; inline interfaces only
-- Return JSON: solidity_source, contract_name, entry_function, entry_value_wei, reasoning
-"""
 
 
 def _format_precedent(precedent_results: list[dict]) -> str:
@@ -175,21 +108,34 @@ def _parse_proposal(raw: str) -> ExploitProposal:
     )
 
 
+def _message_text(message) -> str:
+    """Prefer the JSON content. Fall back to a JSON object in the reasoning trace."""
+    content = (message.content or "").strip()
+    if content:
+        return content
+    reasoning = getattr(message, "reasoning_content", None) or ""
+    start = reasoning.rfind("{")
+    end = reasoning.rfind("}")
+    if start != -1 and end > start:
+        return reasoning[start : end + 1]
+    return ""
+
+
 def _call_ultra(messages: list[dict]) -> tuple[ExploitProposal, str, float]:
     """Call Ultra and parse JSON response. Returns proposal, raw, duration."""
     start = time.time()
     client = _get_client()
     last_err = None
     raw = ""
-    for attempt in range(3):
+    for _attempt in range(3):
         try:
             response = client.chat.completions.create(
                 model=config.MODEL_ULTRA,
                 messages=messages,
                 response_format={"type": "json_object"},
-                max_tokens=8192,
+                max_tokens=16384,
             )
-            raw = response.choices[0].message.content or ""
+            raw = _message_text(response.choices[0].message)
             proposal = _parse_proposal(raw)
             duration = time.time() - start
             return proposal, raw, duration
@@ -201,11 +147,14 @@ def _call_ultra(messages: list[dict]) -> tuple[ExploitProposal, str, float]:
                     "content": (
                         f"Your response was invalid ({exc}). "
                         "Return valid JSON with solidity_source, contract_name, "
-                        "entry_function, entry_value_wei, reasoning."
+                        "entry_function, entry_value_wei, reasoning. "
+                        "Put the JSON in the message content."
                     ),
                 }
             )
-    raise ValueError(f"Ultra returned invalid JSON after retries: {last_err}")
+    raise CompilationFailed(
+        f"Ultra returned invalid JSON after retries: {last_err}"
+    )
 
 
 def propose_exploit(
@@ -215,6 +164,7 @@ def propose_exploit(
     prior_failure: dict | None = None,
     abi: list | None = None,
     target_name: str = "",
+    sandbox_notes: str = "",
 ) -> tuple[ExploitProposal, dict]:
     """
     Generate and compile an exploit contract via Ultra.
@@ -227,14 +177,17 @@ def propose_exploit(
         "compile_attempts": [],
         "llm_calls": [],
     }
-    system_prompt = _system_prompt_for_flags(risk_flags)
     abi_block = _format_abi_summary(abi or [])
+    notes_block = sandbox_notes.strip() or "None."
 
     if prior_failure:
         prev_src = prior_failure.get("previous_source", "")
+        trace = prior_failure.get("trace") or ""
         user_content = f"""Your previous exploit failed.
 
 Revert reason: {clean_revert_reason(prior_failure.get('revert_reason'))}
+Call trace:
+{trace or '(no trace)'}
 Research on this error:
 {_format_precedent(prior_failure.get('research', []))}
 
@@ -248,8 +201,11 @@ TARGET CONTRACT SOURCE:
 TARGET ABI (callable functions):
 {abi_block}
 
-SECURITY ANALYSIS FLAGS:
+RANKED HYPOTHESES:
 {json.dumps(risk_flags, indent=2)}
+
+SANDBOX NOTES:
+{notes_block}
 
 Write a revised exploit contract that avoids this failure mode.
 """
@@ -261,17 +217,20 @@ TARGET CONTRACT SOURCE:
 TARGET ABI (callable functions):
 {abi_block}
 
-SECURITY ANALYSIS FLAGS:
+RANKED HYPOTHESES:
 {json.dumps(risk_flags, indent=2)}
 
 HISTORICAL PRECEDENT (Tavily — use these to shape strategy):
 {_format_precedent(precedent_results)}
 
-Write an exploit contract that drains ETH from this target.
+SANDBOX NOTES:
+{notes_block}
+
+Write an exploit contract that takes value from this target in the local sandbox.
 """
 
     messages = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": GENERIC_EXPLOIT_PROMPT},
         {"role": "user", "content": user_content},
     ]
 
