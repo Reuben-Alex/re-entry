@@ -1,10 +1,15 @@
 # Deploying the Re-entry dashboard
 
-The hackathon requires a **working demo URL**. Local Anvil + Token Factory already
-satisfies the “runs on Nebius Token Factory + NVIDIA open model” rule. Hosting
-makes judging frictionless.
+Judges need an HTTPS URL. The demo is this container: Anvil on
+`127.0.0.1:8545`, the demo contracts, and the dashboard on port 8000.
+`SANDBOX_MODE=local`. Nemotron calls go to Nebius Token Factory. Contree is
+not used.
 
-## Option A — local (demo / video recording)
+Nebius Serverless AI endpoints are long-lived container VMs. Each HTTP port
+gets a managed `https://` URL, so a public IP is optional. Auth stays `none`
+so a Devpost link opens with no header.
+
+## Local
 
 ```bash
 anvil --port 8545 &
@@ -15,7 +20,9 @@ uvicorn dashboard.app:app --host 0.0.0.0 --port 8000
 
 Open http://127.0.0.1:8000
 
-## Option B — Docker (any cloud / Nebius VM)
+## Image
+
+Build from the repo root. `.dockerignore` keeps `.env` out of the image.
 
 ```bash
 docker build -t re-entry-dashboard -f deploy/Dockerfile .
@@ -26,21 +33,62 @@ docker run --rm -p 8000:8000 \
   re-entry-dashboard
 ```
 
-The container starts Anvil, deploys demo contracts, and serves the dashboard on
-port 8000. Point a Nebius Serverless Endpoint, Cloudflare Tunnel, or reverse
-proxy at that port for the public Devpost URL.
+The entrypoint exits if Anvil or contract deploy fails. Stopping the
+container drops chain state; the next start redeploys.
 
-## Option C — Nebius Serverless Endpoint
+## Nebius Serverless AI endpoint
 
-1. Build and push the image to a registry Nebius can pull.
-2. Create a Serverless Endpoint that runs the image with `NEBIUS_API_KEY` and
-   `TAVILY_API_KEY` as secrets.
-3. Paste the HTTPS URL into Devpost as the demo link.
-4. If Contree Sandboxes access is approved, set `SANDBOX_MODE=contree` and
-   `CONTREE_PROJECT_ID`; otherwise keep `local` (Anvil in-container).
+Requires the `nebius` CLI, logged into the hackathon project.
 
-## Health check
+1. Create a Container Registry. Log Docker in with a short-lived token:
 
-`GET /health` → `{"status":"ok"}`
+```bash
+nebius iam get-access-token | docker login "cr.${REGION}.nebius.cloud" \
+  --username iam --password-stdin
+```
 
-`GET /api/status` → anvil / contree / sandbox_mode / results summary
+2. Build and push. Do not pass API keys as build args.
+
+```bash
+docker build --platform linux/amd64 \
+  -t "cr.${REGION}.nebius.cloud/${REGISTRY}/re-entry:demo" \
+  -f deploy/Dockerfile .
+docker push "cr.${REGION}.nebius.cloud/${REGISTRY}/re-entry:demo"
+```
+
+3. Store `NEBIUS_API_KEY` and `TAVILY_API_KEY` in SecretStash. Create an
+   on-demand CPU endpoint (about 4 vCPU / 16 GB). No GPU. Not preemptible.
+
+```bash
+nebius ai endpoint create \
+  --name re-entry \
+  --image "cr.${REGION}.nebius.cloud/${REGISTRY}/re-entry:demo" \
+  --platform cpu-d3 \
+  --preset 4vcpu-16gb \
+  --container-port 8000 \
+  --auth none \
+  --on-demand \
+  --env SANDBOX_MODE=local \
+  --env-secret NEBIUS_API_KEY=<secret> \
+  --env-secret TAVILY_API_KEY=<secret> \
+  --subnet-id <subnet_ID>
+```
+
+4. The HTTPS URL is in `status.public_endpoints`. Check it:
+
+```bash
+curl -fsS "https://<endpoint-host>/health"
+```
+
+Expect `{"status":"ok"}`. Then open the URL and run VulnerableTreasury until
+the Story tab finishes a live pipeline.
+
+5. Stop the endpoint after judging. Compute billing runs while it is up.
+   Anyone with the URL can click Run and spend Token Factory quota. Rotate
+   the keys after the deadline.
+
+## Health
+
+`GET /health` returns `{"status":"ok"}`.
+
+`GET /api/status` reports Anvil, sandbox mode, and whether a results file exists.

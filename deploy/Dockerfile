@@ -2,7 +2,7 @@
 FROM python:3.12-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git ca-certificates \
+    curl git ca-certificates build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Foundry (anvil + cast)
@@ -15,6 +15,12 @@ RUN curl -L https://foundry.paradigm.xyz | bash \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt uvicorn
+# solcx looks up this path. GitHub is used because solc-bin.ethereum.org
+# does not resolve from every build network.
+RUN mkdir -p /root/.solcx \
+    && curl -fsSL -o /root/.solcx/solc-v0.8.19 \
+      https://github.com/ethereum/solidity/releases/download/v0.8.19/solc-static-linux \
+    && chmod +x /root/.solcx/solc-v0.8.19
 
 COPY . .
 

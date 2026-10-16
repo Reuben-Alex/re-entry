@@ -4,6 +4,7 @@ Re-entry web dashboard — full-site UI with live pipeline runs.
 import asyncio
 import json
 import sys
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -317,10 +318,12 @@ async def api_stream(run_id: str):
 
     async def event_generator():
         sent = 0
+        last_yield = time.monotonic()
         while True:
             while sent < len(session.events):
                 yield f"data: {json.dumps(session.events[sent])}\n\n"
                 sent += 1
+                last_yield = time.monotonic()
             if session.done:
                 payload = {
                     "type": "__done__",
@@ -329,6 +332,9 @@ async def api_stream(run_id: str):
                 }
                 yield f"data: {json.dumps(payload)}\n\n"
                 break
+            if time.monotonic() - last_yield >= 15:
+                yield ": keepalive\n\n"
+                last_yield = time.monotonic()
             await asyncio.sleep(0.25)
 
     return StreamingResponse(
