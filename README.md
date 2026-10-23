@@ -257,11 +257,7 @@ demo contracts, and uses Contree's Git-like branching for retry rollback.
 First bootstrap is slow (~5-10 min); later runs reuse the `re-entry-bootstrap`
 image.
 
-> Contree is in **beta** and can return 403 without Sandboxes access. Keep
-> `LocalSandbox` (Anvil) as the fallback — don't make Contree a single point
-> of failure minutes before a demo. Local Anvil + Token Factory already
-> satisfies the "runs on Nebius Token Factory + uses an NVIDIA open model"
-> requirement.
+> Contree is in **beta** and can return 403 without Sandboxes access. 
 
 Docs: [Sandboxes overview](https://docs.tokenfactory.nebius.com/sandboxes/overview.md)
 | [Contree branching](https://docs.tokenfactory.nebius.com/sandboxes/sdk/python_sdk/branching.md)
